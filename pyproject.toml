@@ -3,7 +3,9 @@ name = "lenzr-server"
 description = "Lenzr server application to manage images"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi[standard]>=0.115.8",
+]
 dynamic = ["version"]
 
 [project.urls]
@@ -11,9 +13,6 @@ Homepage = "https://github.com/Alicipy/lenzr-server"
 Documentation = "https://github.com/Alicipy/lenzr-server"
 Repository = "https://github.com/Alicipy/lenzr-server"
 Issues = "https://github.com/Alicipy/lenzr-server/issues"
-
-[project.scripts]
-lenzr-server = "lenzr_server:main"
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.11.2,<0.12.0"]
