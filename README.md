@@ -19,10 +19,19 @@ This project is built with
 * `Python` as the programming language
 * `uv` as the Python package manager
 * `FastAPI` as the web framework
+* `pytest` as the testing framework
 
 ## Contributing
 
 This shall be a guide for contributing to the Lenzr Server project.
+
+### Installing dev dependencies
+
+At first, install all development dependencies with
+
+```sh
+uv sync --dev
+````
 
 ### Running the server in development
 
@@ -30,6 +39,14 @@ To automatically reload the server on code changes, you can use the following co
 
 ```sh
 uv run fastapi run --reload src/lenzr_server/main.py
+```
+
+### Running tests
+
+To run the tests, you can use the following command:
+
+```sh
+uv run pytest
 ```
 
 ### Project management commands
@@ -46,6 +63,11 @@ uv add <package_name>
 
 This will also update the `uv.lock` file with the necessary changes.
 
+If the package is only needed for development purposes (like testing or linting), you can add it to the `dev` group:
+
+```sh
+uv add --dev <package_name>
+```
 
 #### Upgrading versions in the `uv.lock` file
 
