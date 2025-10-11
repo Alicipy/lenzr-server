@@ -1,13 +1,25 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from lenzr_server.main import STORE, app
+from lenzr_server.main import STORE, app, get_id_creator
+from lenzr_server.upload_id_creators.counting_id_creator import CountingIdCreator
 
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def clean_store():
     STORE.clear()
+
+creator = CountingIdCreator()
+def counting_id_creator():
+    return creator
+
+app.dependency_overrides[get_id_creator] = counting_id_creator
+
+@pytest.fixture(autouse=True)
+def reset_counter():
+    creator.id = 0
+
 
 def test__api_put_upload__upload_image_file__returns_201_with_id():
     response = client.put("/uploads", files={"upload": ("test.png", b"Hello, world!", "image/png")})
