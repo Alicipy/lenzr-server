@@ -86,7 +86,7 @@ async def upload_file(
 )
 async def get_upload(upload_id: UploadID,
     file_storage: OnDiskFileStorage = Depends(get_file_storage),
-                     ):
+):
     if upload_id not in STORE:
         raise HTTPException(status_code=404, detail="Upload not found")
 
