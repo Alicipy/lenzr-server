@@ -2,6 +2,10 @@
 import fastapi
 from fastapi import Depends, File, HTTPException, UploadFile
 
+from lenzr_server.file_storages.on_disk_file_storage import (
+    OnDiskFileStorage,
+    OnDiskSearchParameters,
+)
 from lenzr_server.schemas import (
     ErrorResponse,
     ImageResponse,
@@ -16,11 +20,15 @@ app = fastapi.FastAPI(
     title="Lenzr Server",
 )
 
-STORE: dict[UploadID, tuple[bytes, str]] = {}
+STORE: dict[UploadID, tuple[UploadID, str]] = {}
 
 def get_id_creator():
     creator = HashingIDCreator(seed=32)
     return creator
+
+def get_file_storage():
+    file_storage = OnDiskFileStorage(base_path="/tmp/lenzr_server")
+    return file_storage
 
 @app.put(
     "/uploads",
@@ -45,6 +53,7 @@ async def upload_file(
         media_type="image/*"
     ),
     id_creator: IDCreator = Depends(get_id_creator),
+    file_storage: OnDiskFileStorage = Depends(get_file_storage),
 ):
     content = await upload.read()
     content_type = upload.content_type
@@ -52,7 +61,11 @@ async def upload_file(
         raise HTTPException(status_code=400, detail="Bad request - invalid file")
 
     upload_id = id_creator.create_upload_id(content)
-    STORE[upload_id] = (content, content_type)
+
+    on_disk_search_params = OnDiskSearchParameters(on_disk_filename=upload_id)
+    file_storage.add_file(on_disk_search_params, content)
+
+    STORE[upload_id] = (upload_id, content_type)
 
     return UploadResponse(upload_id=upload_id)
 
@@ -71,11 +84,16 @@ async def upload_file(
             "model": ErrorResponse
         }}
 )
-async def get_upload(upload_id: UploadID):
+async def get_upload(upload_id: UploadID,
+    file_storage: OnDiskFileStorage = Depends(get_file_storage),
+                     ):
     if upload_id not in STORE:
         raise HTTPException(status_code=404, detail="Upload not found")
 
-    content, content_type = STORE[upload_id]
+    upload_id, content_type = STORE[upload_id]
+    on_disk_search_params = OnDiskSearchParameters(on_disk_filename=upload_id)
+    content = file_storage.get_file_content(on_disk_search_params)
+
     return ImageResponse(content=content, media_type=content_type)
 
 @app.get(
