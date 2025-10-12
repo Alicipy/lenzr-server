@@ -1,9 +1,11 @@
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from lenzr_server.types import UploadID
+
 
 class UploadResponse(BaseModel):
-    upload_id: str
+    upload_id: UploadID
 
     model_config = {
         "json_schema_extra": {
@@ -14,7 +16,7 @@ class UploadResponse(BaseModel):
     }
 
 class UploadsListResponse(BaseModel):
-    uploads: list[str]
+    uploads: list[UploadID]
 
     model_config = {
         "json_schema_extra": {

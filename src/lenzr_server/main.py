@@ -8,6 +8,7 @@ from lenzr_server.schemas import (
     UploadResponse,
     UploadsListResponse,
 )
+from lenzr_server.types import UploadID
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
 from lenzr_server.upload_id_creators.id_creator import IDCreator
 
@@ -15,7 +16,7 @@ app = fastapi.FastAPI(
     title="Lenzr Server",
 )
 
-STORE: dict[str, tuple[bytes, str]] = {}
+STORE: dict[UploadID, tuple[bytes, str]] = {}
 
 def get_id_creator():
     creator = HashingIDCreator(seed=32)
@@ -70,7 +71,7 @@ async def upload_file(
             "model": ErrorResponse
         }}
 )
-async def get_upload(upload_id: str):
+async def get_upload(upload_id: UploadID):
     if upload_id not in STORE:
         raise HTTPException(status_code=404, detail="Upload not found")
 
