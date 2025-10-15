@@ -19,6 +19,7 @@ This project is built with
 * `Python` as the programming language
 * `uv` as the Python package manager
 * `FastAPI` as the web framework
+* `SQLModel` as an ORM
 * `pytest` as the testing framework
 
 ## Contributing

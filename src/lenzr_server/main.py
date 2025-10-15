@@ -1,11 +1,17 @@
+import logging
+from contextlib import asynccontextmanager
 
 import fastapi
+import sqlalchemy.exc
 from fastapi import Depends, File, HTTPException, UploadFile
+from sqlmodel import Session, create_engine, select
 
+from lenzr_server import models
 from lenzr_server.file_storages.on_disk_file_storage import (
     OnDiskFileStorage,
     OnDiskSearchParameters,
 )
+from lenzr_server.models import UploadMetaData
 from lenzr_server.schemas import (
     ErrorResponse,
     ImageResponse,
@@ -16,11 +22,23 @@ from lenzr_server.types import UploadID
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
 from lenzr_server.upload_id_creators.id_creator import IDCreator
 
+sqlite_file_name = "/tmp/lenzr_server_db.sqlite3"
+sqlite_url = f"sqlite:///{sqlite_file_name}"
+
+connect_args = {"check_same_thread": False}
+engine = create_engine(sqlite_url, connect_args=connect_args)
+
+@asynccontextmanager
+async def db_lifetime(_app: fastapi.FastAPI):
+    models.SQLModel.metadata.create_all(engine)
+    yield
+    models.SQLModel.metadata.drop_all(engine)
+
 app = fastapi.FastAPI(
     title="Lenzr Server",
+    lifespan=db_lifetime,
 )
 
-STORE: dict[UploadID, tuple[UploadID, str]] = {}
 
 def get_id_creator():
     creator = HashingIDCreator(seed=32)
@@ -29,6 +47,10 @@ def get_id_creator():
 def get_file_storage():
     file_storage = OnDiskFileStorage(base_path="/tmp/lenzr_server")
     return file_storage
+
+def get_db_session():
+    with Session(engine) as session:
+        yield session
 
 @app.put(
     "/uploads",
@@ -43,7 +65,11 @@ def get_file_storage():
         400: {
             "description": "Bad request - invalid file",
             "model": ErrorResponse
-        }
+        },
+        409: {
+            "description": "Upload already exists",
+            "model": ErrorResponse
+        },
     },
 )
 async def upload_file(
@@ -54,6 +80,7 @@ async def upload_file(
     ),
     id_creator: IDCreator = Depends(get_id_creator),
     file_storage: OnDiskFileStorage = Depends(get_file_storage),
+    db_session: Session = Depends(get_db_session),
 ):
     content = await upload.read()
     content_type = upload.content_type
@@ -62,10 +89,21 @@ async def upload_file(
 
     upload_id = id_creator.create_upload_id(content)
 
-    on_disk_search_params = OnDiskSearchParameters(on_disk_filename=upload_id)
-    file_storage.add_file(on_disk_search_params, content)
+    try:
+        upload_metadata = UploadMetaData(
+            upload_id=upload_id,
+            content_type=content_type,
+        )
+        db_session.add(upload_metadata)
+        db_session.commit()
 
-    STORE[upload_id] = (upload_id, content_type)
+        on_disk_search_params = OnDiskSearchParameters(on_disk_filename=upload_id)
+        file_storage.add_file(on_disk_search_params, content)
+
+        db_session.refresh(upload_metadata)
+    except sqlalchemy.exc.IntegrityError:
+        logging.error(f"Upload {upload_id} already stored")
+        raise HTTPException(status_code=409, detail="Already exists")
 
     return UploadResponse(upload_id=upload_id)
 
@@ -86,13 +124,22 @@ async def upload_file(
 )
 async def get_upload(upload_id: UploadID,
     file_storage: OnDiskFileStorage = Depends(get_file_storage),
+    db_session: Session = Depends(get_db_session),
 ):
-    if upload_id not in STORE:
+    query = select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
+    try:
+        metadata_entry = db_session.exec(query).one()
+        content_type = metadata_entry.content_type
+    except sqlalchemy.exc.NoResultFound:
+        logging.error(f"Upload {upload_id} not found in database")
         raise HTTPException(status_code=404, detail="Upload not found")
 
-    upload_id, content_type = STORE[upload_id]
-    on_disk_search_params = OnDiskSearchParameters(on_disk_filename=upload_id)
-    content = file_storage.get_file_content(on_disk_search_params)
+    try:
+        on_disk_search_params = OnDiskSearchParameters(on_disk_filename=upload_id)
+        content = file_storage.get_file_content(on_disk_search_params)
+    except FileNotFoundError:
+        logging.error(f"Upload {upload_id} not found on disk")
+        raise HTTPException(status_code=404, detail="Upload not found")
 
     return ImageResponse(content=content, media_type=content_type)
 
@@ -109,5 +156,10 @@ async def get_upload(upload_id: UploadID,
     },
 )
 @app.get("/uploads")
-async def list_uploads():
-    return UploadsListResponse(uploads=list(STORE.keys()))
+async def list_uploads(
+    db_session: Session = Depends(get_db_session),
+):
+    query = select(UploadMetaData.upload_id)
+    ids = db_session.exec(query).all()
+
+    return UploadsListResponse(uploads=list(ids))
