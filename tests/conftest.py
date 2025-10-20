@@ -1,11 +1,12 @@
 import os
+import tempfile
 
 import pytest
 from sqlalchemy import create_engine
 from sqlmodel import Session, SQLModel
 
 os.environ["ENVIRONMENT"] = "development"
-
+os.environ["UPLOAD_STORAGE_PATH"] = tempfile.mkdtemp()
 
 
 @pytest.fixture

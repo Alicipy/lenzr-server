@@ -12,3 +12,6 @@ wheels/
 # Environment files
 .env
 .env.local
+
+# file storage for testing
+lenzr_data

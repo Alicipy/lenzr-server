@@ -1,5 +1,6 @@
 FROM python:3.13.8-alpine3.22
 
+VOLUME ["/var/lib/lenzr"]
 WORKDIR /app/
 
 ARG APP_USER_UID=1000

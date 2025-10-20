@@ -7,10 +7,13 @@ services:
       - "8000:8000"
     networks:
       - internal
+    volumes:
+      - lenzr_data:/var/lib/lenzr
     security_opt:
       - no-new-privileges:true
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - UPLOAD_STORAGE_PATH=${UPLOAD_STORAGE_PATH}
     depends_on:
       - db
 
@@ -34,3 +37,9 @@ networks:
 
 volumes:
   postgres_data:
+  lenzr_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./lenzr_data
+      o: bind

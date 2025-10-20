@@ -1,3 +1,5 @@
+import os
+
 from fastapi import Depends
 from sqlmodel import Session
 
@@ -14,7 +16,8 @@ def get_id_creator():
 
 
 def get_file_storage():
-    file_storage = OnDiskFileStorage(base_path="/tmp/lenzr_server")
+    storage_path = os.environ["UPLOAD_STORAGE_PATH"]
+    file_storage = OnDiskFileStorage(base_path=storage_path)
     return file_storage
 
 
