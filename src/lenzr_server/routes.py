@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from lenzr_server.dependencies import get_upload_service
+from lenzr_server.dependencies import check_login_valid, get_upload_service
 from lenzr_server.schemas import ErrorResponse, ImageResponse, UploadResponse, UploadsListResponse
 from lenzr_server.types import UploadID
 from lenzr_server.upload_service import AlreadyExistingException, NotFoundException, UploadService
@@ -25,6 +25,7 @@ upload_router = APIRouter()
 async def upload_file(
     upload: UploadFile = File(..., description="Image file to upload", media_type="image/*"),
     upload_service: UploadService = Depends(get_upload_service),
+    _login_valid: None = Depends(check_login_valid),
 ):
     content = await upload.read()
     content_type = upload.content_type
@@ -78,6 +79,7 @@ async def get_upload(
 )
 async def list_uploads(
     upload_service: UploadService = Depends(get_upload_service),
+    _login_valid: None = Depends(check_login_valid),
 ):
     ids = upload_service.list_uploads()
 

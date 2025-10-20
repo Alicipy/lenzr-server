@@ -27,6 +27,8 @@ cp .env.example .env
 
 Afterward, look into it and modify accordingly.
 
+You _at least_ want to change the username and password for server access.
+
 ### `docker-compose`
 
 The easiest way to set up the Lenzr Server is by using `docker-compose`.

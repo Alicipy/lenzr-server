@@ -1,8 +1,10 @@
 import os
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlmodel import Session
 
+import lenzr_server.security as security
 from lenzr_server.db import engine
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
@@ -37,3 +39,13 @@ def get_upload_service(
         upload_id_creator=upload_id_creator,
     )
     return upload_service
+
+
+http_basic_auth = HTTPBasic()
+
+
+def check_login_valid(credentials: HTTPBasicCredentials = Depends(http_basic_auth)):
+    is_logged_in = security.is_logged_in(credentials.username, credentials.password)
+    if not is_logged_in:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return None
