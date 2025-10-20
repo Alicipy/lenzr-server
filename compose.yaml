@@ -1,0 +1,14 @@
+services:
+  server:
+    build: .
+    container_name: lenzr_server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  internal:

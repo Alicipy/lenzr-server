@@ -2,16 +2,6 @@
 
 This is a simple REST server to host and share images.
 
-## Running the server
-
-To run the server, you can use the following command:
-
-```sh
-uv run fastapi run src/lenzr_server/main.py
-```
-
-This will install all necessary dependencies and start the server locally.
-
 ## Tech Stack
 
 This project is built with
@@ -21,6 +11,36 @@ This project is built with
 * `FastAPI` as the web framework
 * `SQLModel` as an ORM
 * `pytest` as the testing framework
+
+## Setup
+
+### `docker-compose`
+
+The easiest way to set up the Lenzr Server is by using `docker-compose`.
+
+Start the server as a daemon service with
+
+```sh
+docker compose up -d
+```
+
+It is reachable on port 8000 afterwards.
+
+To stop the server, do
+
+```sh
+docker compose down
+```
+
+### Run manually
+
+Alternatively, you can manually run the server without Docker by executing
+
+```sh
+uv run fastapi run src/lenzr_server/main.py
+```
+
+This will install all necessary dependencies and start the server locally.
 
 ## Contributing
 
