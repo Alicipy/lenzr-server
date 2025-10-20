@@ -2,7 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from lenzr_server import models
-from lenzr_server.main import app, engine, get_id_creator
+from lenzr_server.db import engine
+from lenzr_server.dependencies import get_id_creator
+from lenzr_server.main import app
 from lenzr_server.upload_id_creators.counting_id_creator import CountingIdCreator
 
 client = TestClient(app)
