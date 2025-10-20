@@ -14,6 +14,6 @@ class HashingIDCreator(IDCreator):
         sha256hashlib.update(self._seed.to_bytes(32, "big"))
         sha256hashlib.update(content)
 
-        id_restricted = base64.encodebytes(sha256hashlib.digest()).decode("utf-8")[:32]
+        id_restricted = base64.b32encode(sha256hashlib.digest()).decode("utf-8")[:32]
         upload_id = UploadID(id_restricted)
         return upload_id
