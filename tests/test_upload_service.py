@@ -1,21 +1,12 @@
 import os
 
 import pytest
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import select
 
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
 from lenzr_server.models import UploadMetaData
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
 from lenzr_server.upload_service import AlreadyExistingException, NotFoundException, UploadService
-
-
-@pytest.fixture
-def database_session():
-    engine = create_engine("sqlite:///:memory:")
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        yield session
-    SQLModel.metadata.drop_all(engine)
 
 
 @pytest.fixture
