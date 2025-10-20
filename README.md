@@ -16,6 +16,17 @@ This project is built with
 
 ## Setup
 
+### Configuration
+
+Before starting the server, one needs to configure several options. For that, take the `.env.example` file
+and copy it to `.env`:
+
+```sh
+cp .env.example .env
+```
+
+Afterward, look into it and modify accordingly.
+
 ### `docker-compose`
 
 The easiest way to set up the Lenzr Server is by using `docker-compose`.
