@@ -10,4 +10,3 @@ class CountingIdCreator(IDCreator):
         self.id += 1
         upload_id = UploadID(self.id)
         return upload_id
-

@@ -2,6 +2,7 @@ from typing import Protocol, TypeVar
 
 T = TypeVar("T", contravariant=True)
 
+
 class FileStorage(Protocol[T]):
     def add_file(self, search_params: T, upload_content: bytes) -> None:
         pass

@@ -28,11 +28,13 @@ sqlite_url = f"sqlite:///{sqlite_file_name}"
 connect_args = {"check_same_thread": False}
 engine = create_engine(sqlite_url, connect_args=connect_args)
 
+
 @asynccontextmanager
 async def db_lifetime(_app: fastapi.FastAPI):
     models.SQLModel.metadata.create_all(engine)
     yield
     models.SQLModel.metadata.drop_all(engine)
+
 
 app = fastapi.FastAPI(
     title="Lenzr Server",
@@ -44,13 +46,16 @@ def get_id_creator():
     creator = HashingIDCreator(seed=32)
     return creator
 
+
 def get_file_storage():
     file_storage = OnDiskFileStorage(base_path="/tmp/lenzr_server")
     return file_storage
 
+
 def get_db_session():
     with Session(engine) as session:
         yield session
+
 
 @app.put(
     "/uploads",
@@ -62,22 +67,12 @@ def get_db_session():
         201: {
             "description": "File uploaded successfully",
         },
-        400: {
-            "description": "Bad request - invalid file",
-            "model": ErrorResponse
-        },
-        409: {
-            "description": "Upload already exists",
-            "model": ErrorResponse
-        },
+        400: {"description": "Bad request - invalid file", "model": ErrorResponse},
+        409: {"description": "Upload already exists", "model": ErrorResponse},
     },
 )
 async def upload_file(
-    upload: UploadFile = File(
-        ...,
-        description="Image file to upload",
-        media_type="image/*"
-    ),
+    upload: UploadFile = File(..., description="Image file to upload", media_type="image/*"),
     id_creator: IDCreator = Depends(get_id_creator),
     file_storage: OnDiskFileStorage = Depends(get_file_storage),
     db_session: Session = Depends(get_db_session),
@@ -107,22 +102,22 @@ async def upload_file(
 
     return UploadResponse(upload_id=upload_id)
 
+
 @app.get(
     "/uploads/{upload_id}",
     summary="Get image",
     description="Download an uploaded image by ID",
     response_class=ImageResponse,
     status_code=200,
-    responses = {
+    responses={
         200: {
             "description": "Image content",
         },
-        404: {
-            "description": "Upload not found",
-            "model": ErrorResponse
-        }}
+        404: {"description": "Upload not found", "model": ErrorResponse},
+    },
 )
-async def get_upload(upload_id: UploadID,
+async def get_upload(
+    upload_id: UploadID,
     file_storage: OnDiskFileStorage = Depends(get_file_storage),
     db_session: Session = Depends(get_db_session),
 ):
@@ -142,6 +137,7 @@ async def get_upload(upload_id: UploadID,
         raise HTTPException(status_code=404, detail="Upload not found")
 
     return ImageResponse(content=content, media_type=content_type)
+
 
 @app.get(
     "/uploads",

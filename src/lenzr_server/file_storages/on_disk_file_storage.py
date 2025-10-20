@@ -7,8 +7,8 @@ from lenzr_server.file_storages.file_storage import FileStorage
 class OnDiskSearchParameters(TypedDict):
     on_disk_filename: str
 
-class OnDiskFileStorage(FileStorage[OnDiskSearchParameters]):
 
+class OnDiskFileStorage(FileStorage[OnDiskSearchParameters]):
     def __init__(self, base_path: pathlib.Path | str):
         self._base_path = pathlib.Path(base_path)
 
