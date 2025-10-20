@@ -11,6 +11,8 @@ This project is built with
 * `FastAPI` as the web framework
 * `SQLModel` as an ORM
 * `pytest` as the testing framework
+* `ruff` as a formatter
+* `pre-commit` for automatic execution of checks
 
 ## Setup
 
@@ -53,6 +55,20 @@ At first, install all development dependencies with
 ```sh
 uv sync --dev
 ````
+
+### Activate `pre-commit` hooks
+
+To automatically run checks when you create a commit, install the hooks:
+
+```sh
+uv run pre-commit install
+```
+
+You can also run the checks manually with
+
+```sh
+uv run pre-commit run --all-files
+```
 
 ### Running the server in development
 
