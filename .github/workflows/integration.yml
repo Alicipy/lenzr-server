@@ -53,6 +53,29 @@ jobs:
           path: dist/
           retention-days: 7
 
+        # This way we get the correct version in OpenAPI
+      - name: Install package
+        run: pip install dist/lenzr_server-*.whl
+
+      - name: Fetch OpenAPI schema
+        run: |
+          uv run fastapi run --reload src/lenzr_server/main.py &
+          SERVER_PID=$!
+
+          sleep 5
+
+          curl -s http://localhost:8000/openapi.json -o openapi.json
+
+          kill $SERVER_PID
+
+      - name: Upload OpenAPI schema
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 #v5.0.0
+        with:
+          name: openapi-schema
+          path: openapi.json
+          retention-days: 7
+
+
   build_docker:
     name: Build Docker Container
     runs-on: ubuntu-latest
