@@ -138,3 +138,34 @@ jobs:
           tags: ${{ steps.generate-tag.outputs.image_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+
+  create_release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [python_quality_and_build]
+    if: github.ref_type == 'tag'
+
+    steps:
+      - name: Download Python package artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 #v6.0.0
+        with:
+          name: dist
+          path: dist/
+
+      - name: Download OpenAPI schema
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 #v6.0.0
+        with:
+          name: openapi-schema
+          path: ./
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 #v2.4.1
+        with:
+          draft: true
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/*
+            openapi.json
