@@ -1,0 +1,21 @@
+services:
+  server:
+    build: .
+    command: uv run fastapi dev --host 0.0.0.0 src/lenzr_server/main.py
+    volumes:
+      - "./:/app"
+      - "/app/.venv"
+      - dev_lenzr_data:/var/lib/lenzr
+  db:
+    volumes:
+      - dev_pg_data:/var/lib/postgresql/18/docker
+
+volumes:
+  dev_pg_data:
+    driver_opts:
+     type: tmpfs
+     device: tmpfs
+  dev_lenzr_data:
+    driver_opts:
+     type: tmpfs
+     device: tmpfs

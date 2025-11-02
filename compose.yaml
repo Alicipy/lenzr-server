@@ -1,6 +1,7 @@
 services:
   server:
     build: .
+    image: ghcr.io/alicipy/lenzr-server:latest
     container_name: lenzr_server
     restart: unless-stopped
     ports:

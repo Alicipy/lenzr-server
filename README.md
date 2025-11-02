@@ -83,12 +83,20 @@ You can also run the checks manually with
 uv run pre-commit run --all-files
 ```
 
-### Running the server in development
+### Manual way: Running the server in development
 
 To automatically reload the server on code changes, you can use the following command:
 
 ```sh
 uv run fastapi run --reload src/lenzr_server/main.py
+```
+
+### `docker-compose` way: Running the server in development
+
+You can also use the `compose.dev.yaml` file for a reloading setup. For that, run
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up --build
 ```
 
 ### Running tests
