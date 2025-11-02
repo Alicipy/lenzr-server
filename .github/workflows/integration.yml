@@ -147,6 +147,9 @@ jobs:
     needs: [python_quality_and_build]
     if: github.ref_type == 'tag'
 
+    permissions:
+      contents: write
+
     steps:
       - name: Download Python package artifacts
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 #v6.0.0
