@@ -1,11 +1,7 @@
 import os
-from contextlib import asynccontextmanager
 from typing import Any
 
-import fastapi
 from sqlalchemy import create_engine
-
-from lenzr_server import models
 
 
 def get_database_url() -> str:
@@ -29,11 +25,3 @@ def get_connect_args(db_url: str) -> dict[str, Any]:
 database_url = get_database_url()
 connect_args = get_connect_args(database_url)
 engine = create_engine(database_url, connect_args=connect_args)
-
-
-@asynccontextmanager
-async def db_lifetime(_app: fastapi.FastAPI):
-    models.SQLModel.metadata.create_all(engine)
-    yield
-    if os.getenv("ENVIRONMENT") == "development":
-        models.SQLModel.metadata.drop_all(engine)

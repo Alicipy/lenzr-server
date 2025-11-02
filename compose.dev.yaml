@@ -3,12 +3,34 @@ services:
     build: .
     command: uv run fastapi dev --host 0.0.0.0 src/lenzr_server/main.py
     volumes:
-      - "./:/app"
+      - "./:/app:rw"
       - "/app/.venv"
       - dev_lenzr_data:/var/lib/lenzr
   db:
     volumes:
       - dev_pg_data:/var/lib/postgresql/18/docker
+  alembic_migrate:
+    build: .
+    volumes:
+      - "./:/app:rw"
+      - "/app/.venv"
+  alembic_create:
+    build: .
+    volumes:
+      - "./:/app:rw"
+      - "/app/.venv"
+    command: uv run alembic revision --autogenerate -m 'generated migration'
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    profiles:
+      - create_alembic_migration
+    depends_on:
+      alembic_migrate:
+        condition: service_completed_successfully
 
 volumes:
   dev_pg_data:

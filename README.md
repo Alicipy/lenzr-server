@@ -10,6 +10,7 @@ This project is built with
 * `uv` as the Python package manager
 * `FastAPI` as the web framework
 * `SQLModel` as an ORM
+* `alembic` for database migrations
 * `pytest` as the testing framework
 * `ruff` as a formatter
 * `pre-commit` for automatic execution of checks
@@ -97,6 +98,16 @@ You can also use the `compose.dev.yaml` file for a reloading setup. For that, ru
 
 ```sh
 docker compose -f compose.yaml -f compose.dev.yaml up --build
+```
+
+### Create Alembic migrations
+
+On a change of the database model, one needs to create a new alembic migration to
+update already existing databases to the newest state. The simplest solution
+is to use the proper compose profile `create_alembic_migration` for that:
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml --profile create_alembic_migration up --build
 ```
 
 ### Running tests

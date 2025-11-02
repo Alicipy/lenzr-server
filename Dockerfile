@@ -36,7 +36,8 @@ RUN --mount=type=cache,target=/appuser/.cache/uv \
     --mount=type=bind,source=.git,target=/app/.git \
     uv sync --frozen --no-install-project
 
-COPY ./README.md ./
+COPY ./README.md ./alembic.ini ./
+COPY ./alembic ./alembic
 COPY ./src ./src
 
 RUN --mount=type=cache,target=/appuser/.cache/uv \

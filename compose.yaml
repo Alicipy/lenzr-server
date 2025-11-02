@@ -1,6 +1,5 @@
 services:
   server:
-    build: .
     image: ghcr.io/alicipy/lenzr-server:latest
     container_name: lenzr_server
     restart: unless-stopped
@@ -29,11 +28,24 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
+      - postgres_data:/var/lib/postgresql/18/docker
     networks:
       - internal
     security_opt:
       - no-new-privileges:true
-      - postgres_data:/var/lib/postgresql/18/docker
+
+  alembic_migrate:
+    image: ghcr.io/alicipy/lenzr-server:latest
+    container_name: alembic_migrate
+    command: uv run alembic upgrade head
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - db
 
 networks:
   internal:
