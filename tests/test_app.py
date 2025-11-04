@@ -23,8 +23,8 @@ app.dependency_overrides[get_id_creator] = counting_id_creator
 
 
 @pytest.fixture(autouse=True)
-def reset_counter():
-    creator.id = 0
+def reset_creator():
+    creator.reset()
 
 
 @pytest.fixture(autouse=True)
