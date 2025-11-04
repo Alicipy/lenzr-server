@@ -8,7 +8,7 @@ from lenzr_server.upload_service import AlreadyExistingException, NotFoundExcept
 upload_router = APIRouter()
 
 
-@upload_router.put(
+@upload_router.post(
     "/uploads",
     summary="Upload a file",
     description="Upload a file to the server and receive an upload ID",

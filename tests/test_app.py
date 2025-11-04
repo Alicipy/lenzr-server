@@ -39,8 +39,8 @@ def get_auth_headers(username: str = "test_user", password: str = "test_pass"):
     return {"Authorization": f"Basic {credentials}"}
 
 
-def test__api_put_upload__upload_image_file__returns_201_with_id():
-    response = client.put(
+def test__api_post_upload__upload_image_file__returns_201_with_id():
+    response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
         headers=get_auth_headers(),
@@ -50,13 +50,15 @@ def test__api_put_upload__upload_image_file__returns_201_with_id():
     assert response.json()["upload_id"] == "1"
 
 
-def test__api_put_upload__upload_image_file_without_auth__returns_401_unauthorized():
-    response = client.put("/uploads", files={"upload": ("test.png", b"Hello, world!", "image/png")})
+def test__api_post_upload__upload_image_file_without_auth__returns_401_unauthorized():
+    response = client.post(
+        "/uploads", files={"upload": ("test.png", b"Hello, world!", "image/png")}
+    )
     assert response.status_code == 401
 
 
-def test__api_put_upload__upload_txt_file__returns_400_bad_request():
-    response = client.put(
+def test__api_post_upload__upload_txt_file__returns_400_bad_request():
+    response = client.post(
         "/uploads",
         files={"upload": ("test.txt", b"Hello, world!", "text/plain")},
         headers=get_auth_headers(),
@@ -65,21 +67,21 @@ def test__api_put_upload__upload_txt_file__returns_400_bad_request():
     assert response.json()["detail"] == "Bad request - invalid file"
 
 
-def test__api_put_upload__upload_no_file_type__returns_400_bad_request():
-    response = client.put(
+def test__api_post_upload__upload_no_file_type__returns_400_bad_request():
+    response = client.post(
         "/uploads", files={"upload": ("test", b"Hello, world!")}, headers=get_auth_headers()
     )
     assert response.status_code == 400
 
 
-def test__api_put_upload__upload_no_file__returns_422_validation_error():
-    response = client.put("/uploads", headers=get_auth_headers())
+def test__api_post_upload__upload_no_file__returns_422_validation_error():
+    response = client.post("/uploads", headers=get_auth_headers())
     assert response.status_code == 422
 
 
-def test__api_get_upload_upload_id___get_upload_after_put_with_id__returns_200_with_data():
+def test__api_get_upload_upload_id___get_upload_after_post_with_id__returns_200_with_data():
     # Create a sample image file
-    response = client.put(
+    response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
         headers=get_auth_headers(),
@@ -100,14 +102,14 @@ def test__api_get_upload_upload_id__get_upload_with_invalid_id__returns_404():
     assert response.json()["detail"] == "Upload not found"
 
 
-def test__api_get_uploads__get_uploads_after_put_multiple_files__returns_200_with_ids():
-    response = client.put(
+def test__api_get_uploads__get_uploads_after_post_multiple_files__returns_200_with_ids():
+    response = client.post(
         "/uploads",
         files={"upload": ("test1.png", b"File 1", "image/png")},
         headers=get_auth_headers(),
     )
     response.raise_for_status()
-    response = client.put(
+    response = client.post(
         "/uploads",
         files={"upload": ("test2.jpg", b"File 2", "image/jpeg")},
         headers=get_auth_headers(),
