@@ -57,6 +57,10 @@ class UploadService:
 
         return upload_id
 
+    def get_id_for_content(self, content: bytes) -> UploadID:
+        upload_id = self._upload_id_creator.create_upload_id(content)
+        return upload_id
+
     def get_upload(self, upload_id: UploadID) -> tuple[bytes, str]:
         query = select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
         try:

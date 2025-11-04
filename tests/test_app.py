@@ -50,6 +50,22 @@ def test__api_post_upload__upload_image_file__returns_201_with_id():
     assert response.json()["upload_id"] == "1"
 
 
+def test__api_post_upload__upload_image_file_twice__returns_201_and_200_with_id():
+    response1 = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        headers=get_auth_headers(),
+    )
+    response2 = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        headers=get_auth_headers(),
+    )
+
+    assert response2.status_code == 200
+    assert response1.json()["upload_id"] == response2.json()["upload_id"]
+
+
 def test__api_post_upload__upload_image_file_without_auth__returns_401_unauthorized():
     response = client.post(
         "/uploads", files={"upload": ("test.png", b"Hello, world!", "image/png")}

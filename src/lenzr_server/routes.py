@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
 
 from lenzr_server.dependencies import check_login_valid, get_upload_service
 from lenzr_server.schemas import ErrorResponse, ImageResponse, UploadResponse, UploadsListResponse
@@ -15,14 +16,17 @@ upload_router = APIRouter()
     response_model=UploadResponse,
     status_code=201,
     responses={
+        200: {
+            "description": "Upload already exists",
+        },
         201: {
             "description": "File uploaded successfully",
         },
         400: {"description": "Bad request - invalid file", "model": ErrorResponse},
-        409: {"description": "Upload already exists", "model": ErrorResponse},
     },
 )
 async def upload_file(
+    response: Response,
     upload: UploadFile = File(..., description="Image file to upload", media_type="image/*"),
     upload_service: UploadService = Depends(get_upload_service),
     _login_valid: None = Depends(check_login_valid),
@@ -34,9 +38,12 @@ async def upload_file(
 
     try:
         upload_id = upload_service.add_upload(content, content_type)
+        created = True
     except AlreadyExistingException:
-        raise HTTPException(status_code=409, detail="Already exists")
+        upload_id = upload_service.get_id_for_content(content)
+        created = False
 
+    response.status_code = 201 if created else 200
     return UploadResponse(upload_id=upload_id)
 
 
