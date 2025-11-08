@@ -79,8 +79,13 @@ class UploadService:
 
         return content, content_type
 
-    def list_uploads(self) -> list[UploadID]:
-        query = select(UploadMetaData.upload_id).order_by(desc(UploadMetaData.created_at))
+    def list_uploads(self, offset: int = 0, limit: int = 10) -> list[UploadID]:
+        query = (
+            select(UploadMetaData.upload_id)
+            .order_by(desc(UploadMetaData.created_at))
+            .offset(offset)
+            .limit(limit)
+        )
         ids = self._database_session.exec(query).all()
 
         return ids

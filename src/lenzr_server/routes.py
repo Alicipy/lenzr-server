@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
 from lenzr_server.dependencies import check_login_valid, get_upload_service
@@ -88,7 +88,9 @@ async def get_upload(
 async def list_uploads(
     upload_service: UploadService = Depends(get_upload_service),
     _login_valid: None = Depends(check_login_valid),
+    offset: int = Query(0, description="Number of items to skip"),
+    limit: int = Query(10, description="Maximum number of items to return"),
 ):
-    ids = upload_service.list_uploads()
+    ids = upload_service.list_uploads(offset=offset, limit=limit)
 
     return UploadsListResponse(uploads=list(ids))

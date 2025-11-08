@@ -150,3 +150,44 @@ def test__api_get_uploads__get_uploads_with_no_files__returns_200_with_empty_lis
     assert response.status_code == 200
     assert "uploads" in response.json()
     assert response.json()["uploads"] == []
+
+
+@pytest.mark.parametrize(
+    "offset,limit,expected_upload_ids",
+    [
+        pytest.param(None, None, {"5", "4", "3", "2", "1"}, id="all_default"),
+        pytest.param(
+            None,
+            2,
+            {
+                "5",
+                "4",
+            },
+            id="default_offset",
+        ),
+        pytest.param(2, None, {"3", "2", "1"}, id="default_limit"),
+        pytest.param(1, 3, {"4", "3", "2"}, id="both_set"),
+    ],
+)
+def test__api_get_uploads__pagination(
+    offset: int | None, limit: int | None, expected_upload_ids: set[str]
+):
+    for i in range(5):
+        response = client.post(
+            "/uploads",
+            files={"upload": (f"test{i}.png", f"File {i}".encode(), "image/png")},
+            headers=get_auth_headers(),
+        )
+        response.raise_for_status()
+
+    query_params = {}
+    if limit is not None:
+        query_params["limit"] = limit
+    if offset is not None:
+        query_params["offset"] = offset
+
+    response = client.get("/uploads", headers=get_auth_headers(), params=query_params)
+
+    assert response.status_code == 200
+    assert "uploads" in response.json()
+    assert set(response.json()["uploads"]) == expected_upload_ids
