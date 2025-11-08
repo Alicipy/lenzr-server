@@ -1,7 +1,7 @@
 import logging
 
 import sqlalchemy.exc
-from sqlmodel import Session, select
+from sqlmodel import Session, desc, select
 
 from lenzr_server.file_storages.on_disk_file_storage import (
     OnDiskFileStorage,
@@ -80,7 +80,7 @@ class UploadService:
         return content, content_type
 
     def list_uploads(self) -> list[UploadID]:
-        query = select(UploadMetaData.upload_id)
+        query = select(UploadMetaData.upload_id).order_by(desc(UploadMetaData.created_at))
         ids = self._database_session.exec(query).all()
 
         return ids

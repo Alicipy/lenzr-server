@@ -84,3 +84,12 @@ def test__list_uploads__valid_request__returns_list_of_ids(upload_service, datab
 
     returned_ids = upload_service.list_uploads()
     assert sorted(upload_ids) == sorted(returned_ids)
+
+
+def test__list_uploads__upload_two_files__returns_ordered_ids(upload_service, database_session):
+    first_upload_id = upload_service.add_upload(b"content_1", "text/plain")
+    second_upload_id = upload_service.add_upload(b"content_2", "text/html")
+
+    returned_ids = upload_service.list_uploads()
+
+    assert returned_ids == [second_upload_id, first_upload_id]

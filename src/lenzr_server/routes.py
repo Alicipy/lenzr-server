@@ -75,7 +75,8 @@ async def get_upload(
 @upload_router.get(
     "/uploads",
     summary="List all uploads",
-    description="Get a list of all upload IDs currently stored on the server",
+    description="Get a list of all upload IDs currently stored on the server in "
+    "descending order of upload time.",
     response_model=UploadsListResponse,
     status_code=200,
     responses={
