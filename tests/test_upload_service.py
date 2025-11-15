@@ -84,3 +84,25 @@ def test__list_uploads__valid_request__returns_list_of_ids(upload_service, datab
 
     returned_ids = upload_service.list_uploads()
     assert sorted(upload_ids) == sorted(returned_ids)
+
+
+def test__list_uploads__upload_two_files__returns_ordered_ids(upload_service, database_session):
+    first_upload_id = upload_service.add_upload(b"content_1", "text/plain")
+    second_upload_id = upload_service.add_upload(b"content_2", "text/html")
+
+    returned_ids = upload_service.list_uploads()
+
+    assert returned_ids == [second_upload_id, first_upload_id]
+
+
+def test__list_uploads__with_limit_and_offset__returns_paginated_list_of_ids(
+    upload_service, database_session
+):
+    upload_ids = [
+        upload_service.add_upload(f"content_{i}".encode(), "text/plain") for i in range(5)
+    ]
+
+    returned_ids = upload_service.list_uploads(offset=1, limit=2)
+
+    assert returned_ids[0] == upload_ids[3]
+    assert returned_ids[1] == upload_ids[2]
