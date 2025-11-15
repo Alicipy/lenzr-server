@@ -31,6 +31,9 @@ dev = [
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
 
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true }}]
+
 [tool.ruff]
 # Enable all default rules and extensions
 line-length = 100
