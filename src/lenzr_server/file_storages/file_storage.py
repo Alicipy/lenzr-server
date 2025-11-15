@@ -9,3 +9,6 @@ class FileStorage(Protocol[T]):
 
     def get_file_content(self, search_params: T) -> bytes:
         pass
+
+    def delete_file_content(self, search_params: T) -> None:
+        pass
