@@ -72,6 +72,30 @@ async def get_upload(
     return ImageResponse(content=content, media_type=content_type)
 
 
+@upload_router.delete(
+    "/uploads/{upload_id}",
+    summary="Delete image",
+    description="Delete an uploaded image by ID",
+    status_code=204,
+    responses={
+        204: {
+            "description": "Image deleted",
+        },
+        404: {"description": "Upload not found", "model": ErrorResponse},
+    },
+)
+async def delete_upload(
+    upload_id: UploadID,
+    upload_service: UploadService = Depends(get_upload_service),
+):
+    try:
+        upload_service.delete_upload(upload_id)
+    except NotFoundException:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    return Response(status_code=204)
+
+
 @upload_router.get(
     "/uploads",
     summary="List all uploads",

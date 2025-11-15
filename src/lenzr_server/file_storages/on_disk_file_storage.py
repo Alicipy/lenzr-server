@@ -23,3 +23,7 @@ class OnDiskFileStorage(FileStorage[OnDiskSearchParameters]):
         file_path = self._base_path / on_disk_search_params["on_disk_filename"]
         with open(file_path, "rb") as f:
             return f.read()
+
+    def delete_file_content(self, on_disk_search_params: OnDiskSearchParameters):
+        file_path = self._base_path / on_disk_search_params["on_disk_filename"]
+        file_path.unlink()

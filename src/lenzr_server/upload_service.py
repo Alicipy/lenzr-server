@@ -79,6 +79,24 @@ class UploadService:
 
         return content, content_type
 
+    def delete_upload(self, upload_id):
+        query = select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
+        try:
+            upload = self._database_session.exec(query).one()
+            self._database_session.delete(upload)
+            self._database_session.commit()
+
+        except sqlalchemy.exc.NoResultFound:
+            logging.error(f"Upload {upload_id} not found in database")
+            raise NotFoundException
+
+        try:
+            file_meta_data = OnDiskSearchParameters(on_disk_filename=upload_id)
+            self._file_storage.delete_file_content(file_meta_data)
+        except FileNotFoundError:
+            logging.error(f"Upload {upload_id} not found on disk")
+            raise NotFoundException
+
     def list_uploads(self, offset: int = 0, limit: int = 10) -> list[UploadID]:
         query = (
             select(UploadMetaData.upload_id)
@@ -86,6 +104,7 @@ class UploadService:
             .offset(offset)
             .limit(limit)
         )
+
         ids = self._database_session.exec(query).all()
 
         return ids

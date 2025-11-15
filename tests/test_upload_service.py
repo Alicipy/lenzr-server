@@ -76,6 +76,31 @@ def test__get_upload__missing_database_entry__raises_not_found_exception(upload_
         upload_service.get_upload("missing_upload_id")
 
 
+def test__delete_upload__valid_id__deletes_from_database_and_disk(
+    upload_service, database_session, file_storage
+):
+    content = b"test_content"
+    content_type = "text/plain"
+    upload_id = upload_service.add_upload(content, content_type)
+
+    upload_service.delete_upload(upload_id)
+
+    assert (
+        database_session.exec(
+            select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
+        ).first()
+        is None
+    )
+
+    file_path = os.path.join(file_storage._base_path, upload_id)
+    assert not os.path.exists(file_path)
+
+
+def test__delete_upload__missing_id__raises_upload_not_found_exception(upload_service):
+    with pytest.raises(NotFoundException):
+        upload_service.delete_upload("missing_upload_id")
+
+
 def test__list_uploads__valid_request__returns_list_of_ids(upload_service, database_session):
     upload_ids = [
         upload_service.add_upload(b"content_1", "text/plain"),
