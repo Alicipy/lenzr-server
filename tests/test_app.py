@@ -2,8 +2,8 @@ import base64
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import SQLModel
 
-from lenzr_server import models
 from lenzr_server.db import engine
 from lenzr_server.dependencies import get_id_creator
 from lenzr_server.main import app
@@ -29,9 +29,9 @@ def reset_creator():
 
 @pytest.fixture(autouse=True)
 def clean_db():
-    models.SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.create_all(engine)
     yield
-    models.SQLModel.metadata.drop_all(engine)
+    SQLModel.metadata.drop_all(engine)
 
 
 def get_auth_headers(username: str = "test_user", password: str = "test_pass"):
@@ -118,7 +118,7 @@ def test__api_get_upload_upload_id__get_upload_with_invalid_id__returns_404():
     assert response.json()["detail"] == "Upload not found"
 
 
-def test_api_delete_upload_upload_id__delete_upload_after_post_id__returns_204():
+def test_api_delete_upload_upload_id__delete_upload_after_post_id__returns_200():
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -128,7 +128,7 @@ def test_api_delete_upload_upload_id__delete_upload_after_post_id__returns_204()
     upload_id = response.json()["upload_id"]
 
     response = client.delete(f"/uploads/{upload_id}")
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 def test_api_delete_upload_upload_id__delete_nonexistent_upload_returns_404():
@@ -160,8 +160,9 @@ def test__api_get_uploads__get_uploads_after_post_multiple_files__returns_200_wi
     response = client.get("/uploads", headers=get_auth_headers())
 
     assert response.status_code == 200
-    assert "uploads" in response.json()
-    assert set(response.json()["uploads"]) == {"1", "2"}
+    content = response.json()
+    assert {"upload_id": "1"} in content
+    assert {"upload_id": "2"} in content
 
 
 def test__api_get_uploads__get_uploads_without_auth__returns_401_unauthorized():
@@ -173,8 +174,7 @@ def test__api_get_uploads__get_uploads_with_no_files__returns_200_with_empty_lis
     response = client.get("/uploads", headers=get_auth_headers())
 
     assert response.status_code == 200
-    assert "uploads" in response.json()
-    assert response.json()["uploads"] == []
+    assert response.json() == []
 
 
 @pytest.mark.parametrize(
@@ -214,5 +214,5 @@ def test__api_get_uploads__pagination(
     response = client.get("/uploads", headers=get_auth_headers(), params=query_params)
 
     assert response.status_code == 200
-    assert "uploads" in response.json()
-    assert set(response.json()["uploads"]) == expected_upload_ids
+    upload_ids = {upload["upload_id"] for upload in response.json()}
+    assert upload_ids == expected_upload_ids
