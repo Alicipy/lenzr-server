@@ -1,7 +1,7 @@
 import pytest
 import sqlalchemy.exc
 
-from lenzr_server.models import UploadMetaData
+from lenzr_server.models.uploads import UploadMetaData
 
 
 def test__upload_metadata_model__inserted_correct_data(database_session):

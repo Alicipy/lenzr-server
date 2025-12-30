@@ -2,7 +2,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
 from lenzr_server.dependencies import check_login_valid, get_upload_service
-from lenzr_server.schemas import ErrorResponse, ImageResponse, UploadResponse, UploadsListResponse
+from lenzr_server.models.uploads import (
+    UploadMetaDataCreateResponse,
+    UploadMetaDataDeleteResponse,
+    UploadMetaDataPublicResponse,
+)
+from lenzr_server.schemas import ErrorResponse, ImageResponse
 from lenzr_server.types import UploadID
 from lenzr_server.upload_service import AlreadyExistingException, NotFoundException, UploadService
 
@@ -13,7 +18,7 @@ upload_router = APIRouter()
     "/uploads",
     summary="Upload a file",
     description="Upload a file to the server and receive an upload ID",
-    response_model=UploadResponse,
+    response_model=UploadMetaDataCreateResponse,
     status_code=201,
     responses={
         200: {
@@ -37,14 +42,14 @@ async def upload_file(
         raise HTTPException(status_code=400, detail="Bad request - invalid file")
 
     try:
-        upload_id = upload_service.add_upload(content, content_type)
+        upload = upload_service.add_upload(content, content_type)
         created = True
-    except AlreadyExistingException:
-        upload_id = upload_service.get_id_for_content(content)
+    except AlreadyExistingException as aee:
+        upload = UploadMetaDataPublicResponse(upload_id=aee.upload_id)
         created = False
 
     response.status_code = 201 if created else 200
-    return UploadResponse(upload_id=upload_id)
+    return upload
 
 
 @upload_router.get(
@@ -76,24 +81,23 @@ async def get_upload(
     "/uploads/{upload_id}",
     summary="Delete image",
     description="Delete an uploaded image by ID",
-    status_code=204,
+    status_code=200,
     responses={
-        204: {
+        200: {
             "description": "Image deleted",
         },
         404: {"description": "Upload not found", "model": ErrorResponse},
     },
+    response_model=UploadMetaDataDeleteResponse,
 )
 async def delete_upload(
     upload_id: UploadID,
     upload_service: UploadService = Depends(get_upload_service),
 ):
     try:
-        upload_service.delete_upload(upload_id)
+        return upload_service.delete_upload(upload_id)
     except NotFoundException:
         raise HTTPException(status_code=404, detail="Upload not found")
-
-    return Response(status_code=204)
 
 
 @upload_router.get(
@@ -101,7 +105,7 @@ async def delete_upload(
     summary="List all uploads",
     description="Get a list of all upload IDs currently stored on the server in "
     "descending order of upload time.",
-    response_model=UploadsListResponse,
+    response_model=list[UploadMetaDataPublicResponse],
     status_code=200,
     responses={
         200: {
@@ -115,6 +119,6 @@ async def list_uploads(
     offset: int = Query(0, description="Number of items to skip"),
     limit: int = Query(10, description="Maximum number of items to return"),
 ):
-    ids = upload_service.list_uploads(offset=offset, limit=limit)
+    uploads = upload_service.list_uploads(offset=offset, limit=limit)
 
-    return UploadsListResponse(uploads=list(ids))
+    return uploads

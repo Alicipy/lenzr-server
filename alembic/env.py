@@ -4,7 +4,7 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from lenzr_server.db import get_database_url
-from lenzr_server.models import LenzrServerModel
+from lenzr_server.models.uploads import LenzrServerModel
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

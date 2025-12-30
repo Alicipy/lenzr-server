@@ -7,7 +7,7 @@ from lenzr_server.file_storages.on_disk_file_storage import (
     OnDiskFileStorage,
     OnDiskSearchParameters,
 )
-from lenzr_server.models import UploadMetaData
+from lenzr_server.models.uploads import UploadMetaData
 from lenzr_server.types import UploadID
 from lenzr_server.upload_id_creators.id_creator import IDCreator
 
@@ -17,7 +17,8 @@ class UploadServiceException(Exception):
 
 
 class AlreadyExistingException(UploadServiceException):
-    pass
+    def __init__(self, upload_id: UploadID):
+        self.upload_id = upload_id
 
 
 class NotFoundException(UploadServiceException):
@@ -35,7 +36,7 @@ class UploadService:
         self._file_storage = file_storage
         self._upload_id_creator = upload_id_creator
 
-    def add_upload(self, content: bytes, content_type: str) -> UploadID:
+    def add_upload(self, content: bytes, content_type: str) -> UploadMetaData:
         upload_id = self._upload_id_creator.create_upload_id(content)
 
         try:
@@ -53,9 +54,9 @@ class UploadService:
 
         except sqlalchemy.exc.IntegrityError:
             logging.error(f"Upload {upload_id} already stored")
-            raise AlreadyExistingException
+            raise AlreadyExistingException(upload_id=upload_id)
 
-        return upload_id
+        return upload_metadata
 
     def get_id_for_content(self, content: bytes) -> UploadID:
         upload_id = self._upload_id_creator.create_upload_id(content)
@@ -79,13 +80,12 @@ class UploadService:
 
         return content, content_type
 
-    def delete_upload(self, upload_id):
+    def delete_upload(self, upload_id: UploadID) -> UploadMetaData:
         query = select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
         try:
             upload = self._database_session.exec(query).one()
             self._database_session.delete(upload)
             self._database_session.commit()
-
         except sqlalchemy.exc.NoResultFound:
             logging.error(f"Upload {upload_id} not found in database")
             raise NotFoundException
@@ -97,9 +97,11 @@ class UploadService:
             logging.error(f"Upload {upload_id} not found on disk")
             raise NotFoundException
 
-    def list_uploads(self, offset: int = 0, limit: int = 10) -> list[UploadID]:
+        return upload
+
+    def list_uploads(self, offset: int = 0, limit: int = 10) -> list[UploadMetaData]:
         query = (
-            select(UploadMetaData.upload_id)
+            select(UploadMetaData)
             .order_by(desc(UploadMetaData.created_at))
             .offset(offset)
             .limit(limit)

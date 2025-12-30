@@ -4,7 +4,7 @@ import pytest
 from sqlmodel import select
 
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
-from lenzr_server.models import UploadMetaData
+from lenzr_server.models.uploads import UploadMetaData
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
 from lenzr_server.upload_service import AlreadyExistingException, NotFoundException, UploadService
 
@@ -30,18 +30,18 @@ def test__add_upload__valid_data__stores_in_database_and_disk(
     content = b"test_content"
     content_type = "text/plain"
 
-    upload_id = upload_service.add_upload(content, content_type)
+    upload = upload_service.add_upload(content, content_type)
 
     # Verify database entry
     result = database_session.exec(
-        select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
+        select(UploadMetaData).where(UploadMetaData.upload_id == upload.upload_id)
     ).first()
     assert result is not None
-    assert result.upload_id == upload_id
+    assert result == upload
     assert result.content_type == content_type
 
     # Verify file storage
-    file_path = os.path.join(file_storage._base_path, upload_id)
+    file_path = os.path.join(file_storage._base_path, upload.upload_id)
     assert os.path.exists(file_path)
     with open(file_path, "rb") as f:
         assert f.read() == content
@@ -63,9 +63,9 @@ def test__get_upload__valid_id__returns_content_and_type(
 ):
     content = b"test_content"
     content_type = "text/plain"
-    upload_id = upload_service.add_upload(content, content_type)
+    upload = upload_service.add_upload(content, content_type)
 
-    returned_content, returned_content_type = upload_service.get_upload(upload_id)
+    returned_content, returned_content_type = upload_service.get_upload(upload.upload_id)
 
     assert returned_content == content
     assert returned_content_type == content_type
@@ -81,18 +81,18 @@ def test__delete_upload__valid_id__deletes_from_database_and_disk(
 ):
     content = b"test_content"
     content_type = "text/plain"
-    upload_id = upload_service.add_upload(content, content_type)
+    upload = upload_service.add_upload(content, content_type)
 
-    upload_service.delete_upload(upload_id)
+    upload_service.delete_upload(upload.upload_id)
 
     assert (
         database_session.exec(
-            select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
+            select(UploadMetaData).where(UploadMetaData.upload_id == upload.upload_id)
         ).first()
         is None
     )
 
-    file_path = os.path.join(file_storage._base_path, upload_id)
+    file_path = os.path.join(file_storage._base_path, upload.upload_id)
     assert not os.path.exists(file_path)
 
 
@@ -108,7 +108,11 @@ def test__list_uploads__valid_request__returns_list_of_ids(upload_service, datab
     ]
 
     returned_ids = upload_service.list_uploads()
-    assert sorted(upload_ids) == sorted(returned_ids)
+
+    def order_func(u: UploadMetaData):
+        return u.upload_id
+
+    assert sorted(upload_ids, key=order_func) == sorted(returned_ids, key=order_func)
 
 
 def test__list_uploads__upload_two_files__returns_ordered_ids(upload_service, database_session):
