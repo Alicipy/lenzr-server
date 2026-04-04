@@ -75,10 +75,12 @@ async def upload_file(
 )
 async def search_uploads_by_tags(
     tags: list[TagName] = Query(..., description="Tags to search for (AND logic)"),
+    offset: int = Query(0, description="Number of items to skip"),
+    limit: int = Query(10, description="Maximum number of items to return"),
     tag_service: TagService = Depends(get_tag_service),
     _login_valid: None = Depends(check_login_valid),
 ):
-    results = tag_service.search_by_tags(tags)
+    results = tag_service.search_by_tags(tags, offset=offset, limit=limit)
     return [UploadWithTagsResponse.from_upload_with_tags(r) for r in results]
 
 
@@ -203,8 +205,10 @@ tag_router = APIRouter(prefix="/tags", tags=["Tags"])
     },
 )
 async def list_all_tags(
+    offset: int = Query(0, description="Number of items to skip"),
+    limit: int = Query(100, description="Maximum number of items to return"),
     tag_service: TagService = Depends(get_tag_service),
     _login_valid: None = Depends(check_login_valid),
 ):
-    tags = tag_service.list_all_tags()
+    tags = tag_service.list_all_tags(offset=offset, limit=limit)
     return TagListResponse(tags=tags)

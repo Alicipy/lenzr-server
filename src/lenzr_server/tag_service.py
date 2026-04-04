@@ -84,7 +84,9 @@ class TagService:
         upload = self._get_upload(upload_id)
         return self._get_tags_by_upload_pk(upload.pk)
 
-    def search_by_tags(self, tag_names: list[TagName]) -> list[UploadWithTags]:
+    def search_by_tags(
+        self, tag_names: list[TagName], offset: int = 0, limit: int = 10
+    ) -> list[UploadWithTags]:
         if not tag_names:
             return []
 
@@ -98,6 +100,8 @@ class TagService:
             .where(Tag.name.in_(unique_names))
             .group_by(UploadMetaData.pk)
             .having(sa.func.count(sa.distinct(Tag.name)) == len(unique_names))
+            .offset(offset)
+            .limit(limit)
         )
         uploads = self._database_session.exec(query).all()
         if not uploads:
@@ -123,6 +127,6 @@ class TagService:
             for upload in uploads
         ]
 
-    def list_all_tags(self) -> list[TagName]:
-        query = select(Tag.name).order_by(Tag.name)
+    def list_all_tags(self, offset: int = 0, limit: int = 100) -> list[TagName]:
+        query = select(Tag.name).order_by(Tag.name).offset(offset).limit(limit)
         return list(self._database_session.exec(query).all())
