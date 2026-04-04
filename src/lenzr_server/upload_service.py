@@ -34,6 +34,9 @@ class UploadService:
 
     def add_upload(self, content: bytes, content_type: str) -> UploadMetaData:
         upload_id = self._upload_id_creator.create_upload_id(content)
+        file_id = FileID(upload_id)
+
+        self._file_storage.add_file(file_id, content)
 
         try:
             upload_metadata = UploadMetaData(
@@ -42,14 +45,10 @@ class UploadService:
             )
             self._database_session.add(upload_metadata)
             self._database_session.commit()
-
-            file_id = FileID(upload_id)
-            self._file_storage.add_file(file_id, content)
-
             self._database_session.refresh(upload_metadata)
-
         except sqlalchemy.exc.IntegrityError:
             logging.error(f"Upload {upload_id} already stored")
+            self._file_storage.delete_file_content(file_id)
             raise UploadAlreadyExistingException(upload_id=upload_id)
 
         return upload_metadata

@@ -1,4 +1,5 @@
 import os
+from unittest.mock import MagicMock
 
 import pytest
 from sqlmodel import select
@@ -60,6 +61,36 @@ def test__add_upload__duplicate_entry__raises_already_existing_exception(
 
     with pytest.raises(UploadAlreadyExistingException):
         upload_service.add_upload(content, content_type)
+
+
+def test__add_upload__file_write_fails__no_dangling_db_record(
+    database_session, id_creator, tmp_path
+):
+    file_storage = OnDiskFileStorage(tmp_path)
+    file_storage.add_file = MagicMock(side_effect=OSError("disk full"))
+    service = UploadService(file_storage, database_session, id_creator)
+
+    with pytest.raises(OSError):
+        service.add_upload(b"test_content", "text/plain")
+
+    result = database_session.exec(select(UploadMetaData)).first()
+    assert result is None
+
+
+def test__add_upload__duplicate_entry__cleans_up_orphan_file(
+    upload_service, file_storage, id_creator
+):
+    content = b"test_content"
+    upload_service.add_upload(content, "text/plain")
+
+    upload_id = id_creator.create_upload_id(content)
+    file_path = os.path.join(file_storage._base_path, upload_id)
+    os.remove(file_path)
+
+    with pytest.raises(UploadAlreadyExistingException):
+        upload_service.add_upload(content, "text/plain")
+
+    assert not os.path.exists(file_path)
 
 
 def test__get_upload__valid_id__returns_content_and_type(
