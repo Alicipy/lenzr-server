@@ -5,7 +5,7 @@ from lenzr_server.types import TagName, UploadID
 
 
 class UploadMetaDataCreateResponse(UploadMetaDataBase):
-    pass
+    tags: list[TagName] = []
 
 
 class UploadMetaDataPublicResponse(UploadMetaDataBase):

@@ -511,3 +511,95 @@ def test__api_get_tags__without_auth__returns_401():
     response = client.get("/tags")
 
     assert response.status_code == 401
+
+
+def test__api_post_upload__with_tags__returns_201_with_tags():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["upload_id"] == "1"
+    assert sorted(data["tags"]) == ["landscape", "nature"]
+
+
+def test__api_post_upload__with_tags__tags_are_persisted():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+    upload_id = response.json()["upload_id"]
+
+    tags_response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert tags_response.status_code == 200
+    assert sorted(tags_response.json()["tags"]) == ["landscape", "nature"]
+
+
+def test__api_post_upload__without_tags__returns_201_with_empty_tags():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["tags"] == []
+
+
+def test__api_post_upload__duplicate_with_tags__returns_200_without_tags():
+    client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+def test__api_post_upload__with_invalid_tags__returns_422():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["INVALID"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 422
+
+
+def test__api_post_upload__with_duplicate_tags__persists_deduplicated():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["landscape", "landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 201
+    upload_id = response.json()["upload_id"]
+
+    tags_response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert sorted(tags_response.json()["tags"]) == ["landscape", "nature"]

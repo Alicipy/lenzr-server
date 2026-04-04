@@ -38,7 +38,9 @@ upload_router = APIRouter(prefix="/uploads", tags=["Uploads"])
 async def upload_file(
     response: Response,
     upload: UploadFile = File(..., description="Image file to upload", media_type="image/*"),
+    tags: list[TagName] = Query(default=[]),
     upload_service: UploadService = Depends(get_upload_service),
+    tag_service: TagService = Depends(get_tag_service),
     _login_valid: None = Depends(check_login_valid),
 ):
     content = await upload.read()
@@ -47,14 +49,18 @@ async def upload_file(
         raise HTTPException(status_code=400, detail="Bad request - invalid file")
 
     try:
-        upload = upload_service.add_upload(content, content_type)
+        upload_metadata = upload_service.add_upload(content, content_type)
         created = True
     except UploadAlreadyExistingException as aee:
-        upload = UploadMetaDataPublicResponse(upload_id=aee.upload_id)
+        upload_metadata = UploadMetaDataPublicResponse(upload_id=aee.upload_id)
         created = False
 
+    result_tags: list[TagName] = []
+    if tags and created:
+        result_tags = tag_service.set_tags(upload_metadata.upload_id, tags)
+
     response.status_code = 201 if created else 200
-    return upload
+    return UploadMetaDataCreateResponse(upload_id=upload_metadata.upload_id, tags=result_tags)
 
 
 @upload_router.get(
