@@ -13,5 +13,13 @@ wheels/
 .env
 .env.local
 
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Database files
+*.sqlite3
+
 # file storage for testing
 lenzr_data
