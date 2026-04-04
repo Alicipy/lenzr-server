@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from lenzr_server.models.uploads import UploadMetaDataBase
 
@@ -18,8 +18,4 @@ class UploadMetaDataDeleteResponse(UploadMetaDataBase):
 class ErrorResponse(BaseModel):
     detail: str
 
-    model_config = {
-        "json_schema_extra": {
-            "example": {"detail": "Upload not found"},
-        },
-    }
+    model_config = ConfigDict(json_schema_extra={"example": {"detail": "Upload not found"}})
