@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
-from lenzr_server.dependencies import check_login_valid, get_upload_service
+from lenzr_server.dependencies import check_login_valid, get_tag_service, get_upload_service
 from lenzr_server.responses import NOT_FOUND_RESPONSES, ImageResponse
 from lenzr_server.schemas import (
     ErrorResponse,
+    TagsUpdateRequest,
     UploadMetaDataCreateResponse,
     UploadMetaDataDeleteResponse,
     UploadMetaDataPublicResponse,
+    UploadTagsResponse,
 )
+from lenzr_server.tag_service import TagService
 from lenzr_server.types import UploadID
 from lenzr_server.upload_service import UploadAlreadyExistingException, UploadService
 
@@ -92,6 +95,47 @@ async def delete_upload(
     upload_service: UploadService = Depends(get_upload_service),
 ):
     return upload_service.delete_upload(upload_id)
+
+
+@upload_router.put(
+    "/{upload_id}/tags",
+    summary="Set tags for an upload",
+    description="Replace all tags for an upload with the provided list",
+    response_model=UploadTagsResponse,
+    status_code=200,
+    responses={
+        200: {"description": "Tags updated"},
+        **NOT_FOUND_RESPONSES,
+    },
+)
+async def set_upload_tags(
+    upload_id: UploadID,
+    body: TagsUpdateRequest,
+    tag_service: TagService = Depends(get_tag_service),
+    _login_valid: None = Depends(check_login_valid),
+):
+    tags = tag_service.set_tags(upload_id, body.tags)
+    return UploadTagsResponse(upload_id=upload_id, tags=tags)
+
+
+@upload_router.get(
+    "/{upload_id}/tags",
+    summary="Get tags for an upload",
+    description="Get all tags associated with an upload",
+    response_model=UploadTagsResponse,
+    status_code=200,
+    responses={
+        200: {"description": "Tags for the upload"},
+        **NOT_FOUND_RESPONSES,
+    },
+)
+async def get_upload_tags(
+    upload_id: UploadID,
+    tag_service: TagService = Depends(get_tag_service),
+    _login_valid: None = Depends(check_login_valid),
+):
+    tags = tag_service.get_tags(upload_id)
+    return UploadTagsResponse(upload_id=upload_id, tags=tags)
 
 
 @upload_router.get(

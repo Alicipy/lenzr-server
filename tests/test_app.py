@@ -216,3 +216,156 @@ def test__api_get_uploads__pagination(
     assert response.status_code == 200
     upload_ids = {upload["upload_id"] for upload in response.json()}
     assert upload_ids == expected_upload_ids
+
+
+def _create_upload(content: bytes = b"Hello, world!", filename: str = "test.png"):
+    response = client.post(
+        "/uploads",
+        files={"upload": (filename, content, "image/png")},
+        headers=get_auth_headers(),
+    )
+    response.raise_for_status()
+    return response.json()["upload_id"]
+
+
+def test__api_put_upload_tags__set_tags__returns_200_with_tags():
+    upload_id = _create_upload()
+
+    response = client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["upload_id"] == upload_id
+    assert sorted(data["tags"]) == ["landscape", "nature"]
+
+
+def test__api_put_upload_tags__nonexistent_upload__returns_404():
+    response = client.put(
+        "/uploads/nonexistent/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 404
+
+
+def test__api_put_upload_tags__without_auth__returns_401():
+    upload_id = _create_upload()
+
+    response = client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape"]},
+    )
+
+    assert response.status_code == 401
+
+
+def test__api_put_upload_tags__invalid_tag_name__returns_422():
+    upload_id = _create_upload()
+
+    response = client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["INVALID"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 422
+
+
+def test__api_get_upload_tags__returns_200_with_tags():
+    upload_id = _create_upload()
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["upload_id"] == upload_id
+    assert sorted(data["tags"]) == ["landscape", "nature"]
+
+
+def test__api_get_upload_tags__no_tags__returns_200_with_empty_list():
+    upload_id = _create_upload()
+
+    response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+def test__api_get_upload_tags__nonexistent_upload__returns_404():
+    response = client.get(
+        "/uploads/nonexistent/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 404
+
+
+def test__api_get_upload_tags__without_auth__returns_401():
+    upload_id = _create_upload()
+
+    response = client.get(f"/uploads/{upload_id}/tags")
+
+    assert response.status_code == 401
+
+
+def test__api_put_upload_tags__replace_tags__get_reflects_new_tags():
+    upload_id = _create_upload()
+
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["urban", "night"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert sorted(response.json()["tags"]) == ["night", "urban"]
+
+
+def test__api_put_upload_tags__empty_list__clears_tags():
+    upload_id = _create_upload()
+
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+    response = client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": []},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+    get_response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+    assert get_response.json()["tags"] == []
