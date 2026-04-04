@@ -6,7 +6,11 @@ from sqlmodel import select
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
 from lenzr_server.models.uploads import UploadMetaData
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
-from lenzr_server.upload_service import AlreadyExistingException, NotFoundException, UploadService
+from lenzr_server.upload_service import (
+    UploadAlreadyExistingException,
+    UploadNotFoundException,
+    UploadService,
+)
 
 
 @pytest.fixture
@@ -54,7 +58,7 @@ def test__add_upload__duplicate_entry__raises_already_existing_exception(
     content_type = "text/plain"
     upload_service.add_upload(content, content_type)
 
-    with pytest.raises(AlreadyExistingException):
+    with pytest.raises(UploadAlreadyExistingException):
         upload_service.add_upload(content, content_type)
 
 
@@ -72,7 +76,7 @@ def test__get_upload__valid_id__returns_content_and_type(
 
 
 def test__get_upload__missing_database_entry__raises_not_found_exception(upload_service):
-    with pytest.raises(NotFoundException):
+    with pytest.raises(UploadNotFoundException):
         upload_service.get_upload("missing_upload_id")
 
 
@@ -97,7 +101,7 @@ def test__delete_upload__valid_id__deletes_from_database_and_disk(
 
 
 def test__delete_upload__missing_id__raises_upload_not_found_exception(upload_service):
-    with pytest.raises(NotFoundException):
+    with pytest.raises(UploadNotFoundException):
         upload_service.delete_upload("missing_upload_id")
 
 

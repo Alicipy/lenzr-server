@@ -3,6 +3,7 @@ import logging
 import sqlalchemy.exc
 from sqlmodel import Session, desc, select
 
+from lenzr_server.exceptions import AlreadyExistingException, NotFoundException
 from lenzr_server.file_storages.on_disk_file_storage import (
     OnDiskFileStorage,
     OnDiskSearchParameters,
@@ -12,17 +13,15 @@ from lenzr_server.types import UploadID
 from lenzr_server.upload_id_creators.id_creator import IDCreator
 
 
-class UploadServiceException(Exception):
-    pass
-
-
-class AlreadyExistingException(UploadServiceException):
+class UploadAlreadyExistingException(AlreadyExistingException):
     def __init__(self, upload_id: UploadID):
         self.upload_id = upload_id
+        super().__init__(detail="Upload already exists")
 
 
-class NotFoundException(UploadServiceException):
-    pass
+class UploadNotFoundException(NotFoundException):
+    def __init__(self):
+        super().__init__(detail="Upload not found")
 
 
 class UploadService:
@@ -54,7 +53,7 @@ class UploadService:
 
         except sqlalchemy.exc.IntegrityError:
             logging.error(f"Upload {upload_id} already stored")
-            raise AlreadyExistingException(upload_id=upload_id)
+            raise UploadAlreadyExistingException(upload_id=upload_id)
 
         return upload_metadata
 
@@ -69,14 +68,14 @@ class UploadService:
             content_type = metadata_entry.content_type
         except sqlalchemy.exc.NoResultFound:
             logging.error(f"Upload {upload_id} not found in database")
-            raise NotFoundException
+            raise UploadNotFoundException()
 
         try:
             file_meta_data = OnDiskSearchParameters(on_disk_filename=upload_id)
             content = self._file_storage.get_file_content(file_meta_data)
         except FileNotFoundError:
             logging.error(f"Upload {upload_id} not found on disk")
-            raise NotFoundException
+            raise UploadNotFoundException()
 
         return content, content_type
 
@@ -88,14 +87,14 @@ class UploadService:
             self._database_session.commit()
         except sqlalchemy.exc.NoResultFound:
             logging.error(f"Upload {upload_id} not found in database")
-            raise NotFoundException
+            raise UploadNotFoundException()
 
         try:
             file_meta_data = OnDiskSearchParameters(on_disk_filename=upload_id)
             self._file_storage.delete_file_content(file_meta_data)
         except FileNotFoundError:
             logging.error(f"Upload {upload_id} not found on disk")
-            raise NotFoundException
+            raise UploadNotFoundException()
 
         return upload
 
