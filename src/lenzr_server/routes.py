@@ -12,11 +12,11 @@ from lenzr_server.schemas import ErrorResponse, ImageResponse
 from lenzr_server.types import UploadID
 from lenzr_server.upload_service import UploadAlreadyExistingException, UploadService
 
-upload_router = APIRouter()
+upload_router = APIRouter(prefix="/uploads", tags=["Uploads"])
 
 
 @upload_router.post(
-    "/uploads",
+    "",
     summary="Upload a file",
     description="Upload a file to the server and receive an upload ID",
     response_model=UploadMetaDataCreateResponse,
@@ -54,7 +54,7 @@ async def upload_file(
 
 
 @upload_router.get(
-    "/uploads/{upload_id}",
+    "/{upload_id}",
     summary="Get image",
     description="Download an uploaded image by ID",
     response_class=ImageResponse,
@@ -75,7 +75,7 @@ async def get_upload(
 
 
 @upload_router.delete(
-    "/uploads/{upload_id}",
+    "/{upload_id}",
     summary="Delete image",
     description="Delete an uploaded image by ID",
     status_code=200,
@@ -95,7 +95,7 @@ async def delete_upload(
 
 
 @upload_router.get(
-    "/uploads",
+    "",
     summary="List all uploads",
     description="Get a list of all upload IDs currently stored on the server in "
     "descending order of upload time.",
