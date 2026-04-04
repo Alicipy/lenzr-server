@@ -369,3 +369,145 @@ def test__api_put_upload_tags__empty_list__clears_tags():
         headers=get_auth_headers(),
     )
     assert get_response.json()["tags"] == []
+
+
+def test__api_get_uploads_search__and_logic__returns_matching_uploads():
+    upload_id1 = _create_upload(b"file1", "f1.png")
+    upload_id2 = _create_upload(b"file2", "f2.png")
+
+    client.put(
+        f"/uploads/{upload_id1}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+    client.put(
+        f"/uploads/{upload_id2}/tags",
+        json={"tags": ["landscape", "urban"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["upload_id"] == upload_id1
+
+
+def test__api_get_uploads_search__and_logic__response_includes_all_tags():
+    upload_id1 = _create_upload(b"file1", "f1.png")
+    _create_upload(b"file2", "f2.png")
+
+    client.put(
+        f"/uploads/{upload_id1}/tags",
+        json={"tags": ["landscape", "nature", "sunset"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["upload_id"] == upload_id1
+    assert sorted(data[0]["tags"]) == ["landscape", "nature", "sunset"]
+
+
+def test__api_get_uploads_search__single_tag__returns_all_matching():
+    upload_id1 = _create_upload(b"file1", "f1.png")
+    upload_id2 = _create_upload(b"file2", "f2.png")
+
+    client.put(
+        f"/uploads/{upload_id1}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+    client.put(
+        f"/uploads/{upload_id2}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+
+
+def test__api_get_uploads_search__invalid_tag_name__returns_422():
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["INVALID"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 422
+
+
+def test__api_get_uploads_search__no_matches__returns_empty():
+    _create_upload()
+
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["nonexistent"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test__api_get_uploads_search__without_auth__returns_401():
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["landscape"]},
+    )
+
+    assert response.status_code == 401
+
+
+def test__api_get_tags__returns_all_tags():
+    upload_id1 = _create_upload(b"file1", "f1.png")
+    upload_id2 = _create_upload(b"file2", "f2.png")
+
+    client.put(
+        f"/uploads/{upload_id1}/tags",
+        json={"tags": ["nature", "landscape"]},
+        headers=get_auth_headers(),
+    )
+    client.put(
+        f"/uploads/{upload_id2}/tags",
+        json={"tags": ["urban"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get("/tags", headers=get_auth_headers())
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == ["landscape", "nature", "urban"]
+
+
+def test__api_get_tags__empty__returns_empty():
+    response = client.get("/tags", headers=get_auth_headers())
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+def test__api_get_tags__without_auth__returns_401():
+    response = client.get("/tags")
+
+    assert response.status_code == 401

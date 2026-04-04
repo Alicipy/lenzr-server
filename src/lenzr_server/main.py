@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 
 import lenzr_server
 from lenzr_server.exceptions import NotFoundException
-from lenzr_server.routes import upload_router
+from lenzr_server.routes import tag_router, upload_router
 
 app = fastapi.FastAPI(
     title="Lenzr Server",
@@ -11,6 +11,7 @@ app = fastapi.FastAPI(
 )
 
 app.include_router(upload_router)
+app.include_router(tag_router)
 
 
 @app.exception_handler(NotFoundException)

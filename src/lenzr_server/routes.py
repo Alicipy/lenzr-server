@@ -5,6 +5,7 @@ from lenzr_server.dependencies import check_login_valid, get_tag_service, get_up
 from lenzr_server.responses import NOT_FOUND_RESPONSES, ImageResponse
 from lenzr_server.schemas import (
     ErrorResponse,
+    TagListResponse,
     TagsUpdateRequest,
     UploadMetaDataCreateResponse,
     UploadMetaDataDeleteResponse,
@@ -12,7 +13,7 @@ from lenzr_server.schemas import (
     UploadTagsResponse,
 )
 from lenzr_server.tag_service import TagService
-from lenzr_server.types import UploadID
+from lenzr_server.types import TagName, UploadID
 from lenzr_server.upload_service import UploadAlreadyExistingException, UploadService
 
 upload_router = APIRouter(prefix="/uploads", tags=["Uploads"])
@@ -54,6 +55,25 @@ async def upload_file(
 
     response.status_code = 201 if created else 200
     return upload
+
+
+@upload_router.get(
+    "/search",
+    summary="Search uploads by tags",
+    description="Find uploads that have all specified tags (AND logic)",
+    response_model=list[UploadTagsResponse],
+    status_code=200,
+    responses={
+        200: {"description": "List of matching uploads with their tags"},
+    },
+)
+async def search_uploads_by_tags(
+    tags: list[TagName] = Query(..., description="Tags to search for (AND logic)"),
+    tag_service: TagService = Depends(get_tag_service),
+    _login_valid: None = Depends(check_login_valid),
+):
+    results = tag_service.search_by_tags(tags)
+    return [UploadTagsResponse(upload_id=r.upload_id, tags=r.tags) for r in results]
 
 
 @upload_router.get(
@@ -160,3 +180,24 @@ async def list_uploads(
     uploads = upload_service.list_uploads(offset=offset, limit=limit)
 
     return uploads
+
+
+tag_router = APIRouter(prefix="/tags", tags=["Tags"])
+
+
+@tag_router.get(
+    "",
+    summary="List all tags",
+    description="Get a list of all tag names",
+    response_model=TagListResponse,
+    status_code=200,
+    responses={
+        200: {"description": "List of all tags"},
+    },
+)
+async def list_all_tags(
+    tag_service: TagService = Depends(get_tag_service),
+    _login_valid: None = Depends(check_login_valid),
+):
+    tags = tag_service.list_all_tags()
+    return TagListResponse(tags=tags)
