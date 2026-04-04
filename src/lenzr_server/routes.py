@@ -121,6 +121,7 @@ async def get_upload(
 async def delete_upload(
     upload_id: UploadID,
     upload_service: UploadService = Depends(get_upload_service),
+    _login_valid: None = Depends(check_login_valid),
 ):
     return upload_service.delete_upload(upload_id)
 
