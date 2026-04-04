@@ -44,9 +44,10 @@ class UploadService:
                 content_type=content_type,
             )
             self._database_session.add(upload_metadata)
-            self._database_session.commit()
+            self._database_session.flush()
             self._database_session.refresh(upload_metadata)
         except sqlalchemy.exc.IntegrityError:
+            self._database_session.rollback()
             logging.error(f"Upload {upload_id} already stored")
             self._file_storage.delete_file_content(file_id)
             raise UploadAlreadyExistingException(upload_id=upload_id)
@@ -80,7 +81,7 @@ class UploadService:
         try:
             upload = self._database_session.exec(query).one()
             self._database_session.delete(upload)
-            self._database_session.commit()
+            self._database_session.flush()
         except sqlalchemy.exc.NoResultFound:
             logging.error(f"Upload {upload_id} not found in database")
             raise UploadNotFoundException()
