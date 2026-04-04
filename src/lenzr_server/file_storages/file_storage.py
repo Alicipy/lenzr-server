@@ -1,14 +1,14 @@
-from typing import Protocol, TypeVar
+from typing import NewType, Protocol
 
-T = TypeVar("T", contravariant=True)
+FileID = NewType("FileID", str)
 
 
-class FileStorage(Protocol[T]):
-    def add_file(self, search_params: T, upload_content: bytes) -> None:
+class FileStorage(Protocol):
+    def add_file(self, file_id: FileID, content: bytes) -> None:
         pass
 
-    def get_file_content(self, search_params: T) -> bytes:
+    def get_file_content(self, file_id: FileID) -> bytes:
         pass
 
-    def delete_file_content(self, search_params: T) -> None:
+    def delete_file_content(self, file_id: FileID) -> None:
         pass

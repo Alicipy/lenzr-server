@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 import lenzr_server.security as security
 from lenzr_server.db import engine
+from lenzr_server.file_storages.file_storage import FileStorage
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
 from lenzr_server.upload_id_creators.id_creator import IDCreator
@@ -29,7 +30,7 @@ def get_db_session():
 
 
 def get_upload_service(
-    file_storage: OnDiskFileStorage = Depends(get_file_storage),
+    file_storage: FileStorage = Depends(get_file_storage),
     db_session: Session = Depends(get_db_session),
     upload_id_creator: IDCreator = Depends(get_id_creator),
 ):

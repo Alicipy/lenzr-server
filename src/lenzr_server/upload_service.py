@@ -4,10 +4,7 @@ import sqlalchemy.exc
 from sqlmodel import Session, desc, select
 
 from lenzr_server.exceptions import AlreadyExistingException, NotFoundException
-from lenzr_server.file_storages.on_disk_file_storage import (
-    OnDiskFileStorage,
-    OnDiskSearchParameters,
-)
+from lenzr_server.file_storages.file_storage import FileID, FileStorage
 from lenzr_server.models.uploads import UploadMetaData
 from lenzr_server.types import UploadID
 from lenzr_server.upload_id_creators.id_creator import IDCreator
@@ -27,7 +24,7 @@ class UploadNotFoundException(NotFoundException):
 class UploadService:
     def __init__(
         self,
-        file_storage: OnDiskFileStorage,
+        file_storage: FileStorage,
         database_session: Session,
         upload_id_creator: IDCreator,
     ):
@@ -46,8 +43,8 @@ class UploadService:
             self._database_session.add(upload_metadata)
             self._database_session.commit()
 
-            file_metadata = OnDiskSearchParameters(on_disk_filename=upload_id)
-            self._file_storage.add_file(file_metadata, content)
+            file_id = FileID(upload_id)
+            self._file_storage.add_file(file_id, content)
 
             self._database_session.refresh(upload_metadata)
 
@@ -71,8 +68,8 @@ class UploadService:
             raise UploadNotFoundException()
 
         try:
-            file_meta_data = OnDiskSearchParameters(on_disk_filename=upload_id)
-            content = self._file_storage.get_file_content(file_meta_data)
+            file_id = FileID(upload_id)
+            content = self._file_storage.get_file_content(file_id)
         except FileNotFoundError:
             logging.error(f"Upload {upload_id} not found on disk")
             raise UploadNotFoundException()
@@ -90,8 +87,8 @@ class UploadService:
             raise UploadNotFoundException()
 
         try:
-            file_meta_data = OnDiskSearchParameters(on_disk_filename=upload_id)
-            self._file_storage.delete_file_content(file_meta_data)
+            file_id = FileID(upload_id)
+            self._file_storage.delete_file_content(file_id)
         except FileNotFoundError:
             logging.error(f"Upload {upload_id} not found on disk")
             raise UploadNotFoundException()
