@@ -19,15 +19,3 @@ class UploadMetaData(UploadMetaDataBase, table=True):
         default_factory=partial(datetime.datetime.now, datetime.UTC)
     )
     content_type: str = Field(max_length=32)
-
-
-class UploadMetaDataCreateResponse(UploadMetaDataBase):
-    pass
-
-
-class UploadMetaDataPublicResponse(UploadMetaDataBase):
-    pass
-
-
-class UploadMetaDataDeleteResponse(UploadMetaDataBase):
-    pass

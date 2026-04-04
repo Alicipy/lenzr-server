@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
 from lenzr_server.dependencies import check_login_valid, get_upload_service
-from lenzr_server.models.uploads import (
+from lenzr_server.responses import NOT_FOUND_RESPONSES, ImageResponse
+from lenzr_server.schemas import (
+    ErrorResponse,
     UploadMetaDataCreateResponse,
     UploadMetaDataDeleteResponse,
     UploadMetaDataPublicResponse,
 )
-from lenzr_server.responses import NOT_FOUND_RESPONSES
-from lenzr_server.schemas import ErrorResponse, ImageResponse
 from lenzr_server.types import UploadID
 from lenzr_server.upload_service import UploadAlreadyExistingException, UploadService
 
