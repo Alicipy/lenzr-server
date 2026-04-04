@@ -2,7 +2,7 @@ import os
 import tempfile
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlmodel import Session, SQLModel
 
 os.environ["ENVIRONMENT"] = "development"
@@ -12,6 +12,7 @@ os.environ["UPLOAD_STORAGE_PATH"] = tempfile.mkdtemp()
 @pytest.fixture
 def database_session():
     engine = create_engine("sqlite:///:memory:")
+    event.listen(engine, "connect", lambda conn, _: conn.execute("PRAGMA foreign_keys=ON"))
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
