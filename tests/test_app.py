@@ -241,6 +241,8 @@ def test__api_put_upload_tags__set_tags__returns_200_with_tags():
     data = response.json()
     assert data["upload_id"] == upload_id
     assert sorted(data["tags"]) == ["landscape", "nature"]
+    assert "created_at" in data
+    assert data["content_type"] == "image/png"
 
 
 def test__api_put_upload_tags__nonexistent_upload__returns_404():
@@ -293,6 +295,8 @@ def test__api_get_upload_tags__returns_200_with_tags():
     data = response.json()
     assert data["upload_id"] == upload_id
     assert sorted(data["tags"]) == ["landscape", "nature"]
+    assert "created_at" in data
+    assert data["content_type"] == "image/png"
 
 
 def test__api_get_upload_tags__no_tags__returns_200_with_empty_list():
@@ -419,6 +423,8 @@ def test__api_get_uploads_search__and_logic__response_includes_all_tags():
     assert len(data) == 1
     assert data[0]["upload_id"] == upload_id1
     assert sorted(data[0]["tags"]) == ["landscape", "nature", "sunset"]
+    assert "created_at" in data[0]
+    assert data[0]["content_type"] == "image/png"
 
 
 def test__api_get_uploads_search__single_tag__returns_all_matching():

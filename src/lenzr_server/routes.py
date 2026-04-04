@@ -10,7 +10,7 @@ from lenzr_server.schemas import (
     UploadMetaDataCreateResponse,
     UploadMetaDataDeleteResponse,
     UploadMetaDataPublicResponse,
-    UploadTagsResponse,
+    UploadWithTagsResponse,
 )
 from lenzr_server.tag_service import TagService
 from lenzr_server.types import TagName, UploadID
@@ -67,7 +67,7 @@ async def upload_file(
     "/search",
     summary="Search uploads by tags",
     description="Find uploads that have all specified tags (AND logic)",
-    response_model=list[UploadTagsResponse],
+    response_model=list[UploadWithTagsResponse],
     status_code=200,
     responses={
         200: {"description": "List of matching uploads with their tags"},
@@ -79,7 +79,7 @@ async def search_uploads_by_tags(
     _login_valid: None = Depends(check_login_valid),
 ):
     results = tag_service.search_by_tags(tags)
-    return [UploadTagsResponse(upload_id=r.upload_id, tags=r.tags) for r in results]
+    return [UploadWithTagsResponse.from_upload_with_tags(r) for r in results]
 
 
 @upload_router.get(
@@ -127,7 +127,7 @@ async def delete_upload(
     "/{upload_id}/tags",
     summary="Set tags for an upload",
     description="Replace all tags for an upload with the provided list",
-    response_model=UploadTagsResponse,
+    response_model=UploadWithTagsResponse,
     status_code=200,
     responses={
         200: {"description": "Tags updated"},
@@ -140,15 +140,16 @@ async def set_upload_tags(
     tag_service: TagService = Depends(get_tag_service),
     _login_valid: None = Depends(check_login_valid),
 ):
-    tags = tag_service.set_tags(upload_id, body.tags)
-    return UploadTagsResponse(upload_id=upload_id, tags=tags)
+    tag_service.set_tags(upload_id, body.tags)
+    result = tag_service.get_upload_with_tags(upload_id)
+    return UploadWithTagsResponse.from_upload_with_tags(result)
 
 
 @upload_router.get(
     "/{upload_id}/tags",
     summary="Get tags for an upload",
     description="Get all tags associated with an upload",
-    response_model=UploadTagsResponse,
+    response_model=UploadWithTagsResponse,
     status_code=200,
     responses={
         200: {"description": "Tags for the upload"},
@@ -160,8 +161,8 @@ async def get_upload_tags(
     tag_service: TagService = Depends(get_tag_service),
     _login_valid: None = Depends(check_login_valid),
 ):
-    tags = tag_service.get_tags(upload_id)
-    return UploadTagsResponse(upload_id=upload_id, tags=tags)
+    result = tag_service.get_upload_with_tags(upload_id)
+    return UploadWithTagsResponse.from_upload_with_tags(result)
 
 
 @upload_router.get(

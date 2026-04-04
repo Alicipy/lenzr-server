@@ -101,6 +101,8 @@ def test__search_by_tags__and_logic__returns_matching_uploads(tag_service, datab
     assert len(results) == 1
     assert results[0].upload_id == "upload1"
     assert sorted(results[0].tags) == ["landscape", "nature", "sunset"]
+    assert results[0].content_type == "image/png"
+    assert results[0].created_at is not None
 
 
 def test__search_by_tags__single_tag__returns_all_matching(tag_service, database_session):
