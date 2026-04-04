@@ -8,6 +8,7 @@ from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
 from lenzr_server.models.uploads import UploadMetaData
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
 from lenzr_server.upload_service import (
+    LazyUpload,
     UploadAlreadyExistingException,
     UploadNotFoundException,
     UploadService,
@@ -27,6 +28,53 @@ def id_creator():
 @pytest.fixture
 def upload_service(database_session, file_storage, id_creator):
     return UploadService(file_storage, database_session, id_creator)
+
+
+def test__lazy_upload__does_not_call_loader_until_load_content():
+    call_count = 0
+
+    def loader():
+        nonlocal call_count
+        call_count += 1
+        return b"content"
+
+    lazy = LazyUpload(content_type="image/png", load_fn=loader)
+
+    assert lazy.content_type == "image/png"
+    assert call_count == 0
+
+
+def test__lazy_upload__load_content__caches_result():
+    call_count = 0
+
+    def loader():
+        nonlocal call_count
+        call_count += 1
+        return b"content"
+
+    lazy = LazyUpload(content_type="image/png", load_fn=loader)
+
+    first = lazy.load_content()
+    second = lazy.load_content()
+
+    assert first == second == b"content"
+    assert call_count == 1
+
+
+def test__get_lazy_upload__valid_id__returns_lazy_upload_with_deferred_content(
+    upload_service, file_storage
+):
+    upload = upload_service.add_upload(b"test_content", "image/png")
+
+    lazy = upload_service.get_lazy_upload(upload.upload_id)
+
+    assert lazy.content_type == "image/png"
+    assert lazy.load_content() == b"test_content"
+
+
+def test__get_lazy_upload__missing_id__raises_not_found(upload_service):
+    with pytest.raises(UploadNotFoundException):
+        upload_service.get_lazy_upload("missing_id")
 
 
 def test__add_upload__valid_data__stores_in_database_and_disk(

@@ -16,7 +16,9 @@ ENV PYTHONPATH=/app
 ENV PATH="/app/.venv/bin:$PATH"
 
 RUN apk add --no-cache \
-    git
+    git \
+    jpeg-dev \
+    zlib-dev
 
 RUN addgroup -g ${APP_USER_GID} -S appgroup && adduser -u ${APP_USER_UID} -S appuser -G appgroup
 
