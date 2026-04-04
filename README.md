@@ -1,6 +1,17 @@
 # Lenzr Server
 
-This is a simple REST server to host and share images.
+A REST server to host, tag, and search images.
+
+## Features
+
+- Upload, serve, list, and delete images via REST API
+- Content-based deduplication of uploads
+- Tag images with lowercase keywords, search by tags (AND logic)
+- List all tags in use across uploads
+- Auto-generated JPEG thumbnails
+- Pagination on list and search endpoints
+- HTTP Basic authentication
+- OpenAPI documentation at `/docs`
 
 ## Tech Stack
 
