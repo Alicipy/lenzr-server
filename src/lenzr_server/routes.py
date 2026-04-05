@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
-from lenzr_server.dependencies import check_login_valid, get_tag_service, get_upload_service
+from lenzr_server.dependencies import (
+    check_login_valid,
+    get_tag_service,
+    get_thumbnail_service,
+    get_upload_service,
+)
 from lenzr_server.responses import NOT_FOUND_RESPONSES, ImageResponse
 from lenzr_server.schemas import (
     ErrorResponse,
@@ -13,6 +18,7 @@ from lenzr_server.schemas import (
     UploadWithTagsResponse,
 )
 from lenzr_server.tag_service import TagService
+from lenzr_server.thumbnail_service import THUMBNAIL_CONTENT_TYPE, ThumbnailService
 from lenzr_server.types import TagName, UploadID
 from lenzr_server.upload_service import UploadAlreadyExistingException, UploadService
 
@@ -105,6 +111,27 @@ async def get_upload(
     return ImageResponse(content=content, media_type=content_type)
 
 
+@upload_router.get(
+    "/{upload_id}/thumbnail",
+    summary="Get image thumbnail",
+    description="Download a 200px max-dimension JPEG thumbnail of an uploaded image",
+    response_class=ImageResponse,
+    status_code=200,
+    responses={
+        200: {"description": "Thumbnail image content"},
+        404: {"description": "Upload not found", "model": ErrorResponse},
+    },
+)
+async def get_upload_thumbnail(
+    upload_id: UploadID,
+    upload_service: UploadService = Depends(get_upload_service),
+    thumbnail_service: ThumbnailService = Depends(get_thumbnail_service),
+):
+    upload = upload_service.get_lazy_upload(upload_id)
+    thumbnail = thumbnail_service.get_thumbnail(upload_id, upload.load_content)
+    return ImageResponse(content=thumbnail, media_type=THUMBNAIL_CONTENT_TYPE)
+
+
 @upload_router.delete(
     "/{upload_id}",
     summary="Delete image",
@@ -121,9 +148,12 @@ async def get_upload(
 async def delete_upload(
     upload_id: UploadID,
     upload_service: UploadService = Depends(get_upload_service),
+    thumbnail_service: ThumbnailService = Depends(get_thumbnail_service),
     _login_valid: None = Depends(check_login_valid),
 ):
-    return upload_service.delete_upload(upload_id)
+    result = upload_service.delete_upload(upload_id)
+    thumbnail_service.evict(upload_id)
+    return result
 
 
 @upload_router.put(

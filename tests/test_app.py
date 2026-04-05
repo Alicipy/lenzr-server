@@ -1,7 +1,9 @@
 import base64
+import io
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlmodel import SQLModel
 
 from lenzr_server.db import engine
@@ -621,3 +623,49 @@ def test__api_post_upload__with_duplicate_tags__persists_deduplicated():
     )
 
     assert sorted(tags_response.json()["tags"]) == ["landscape", "nature"]
+
+
+def _create_real_image(width: int = 800, height: int = 600) -> bytes:
+    image = Image.new("RGB", (width, height), color="blue")
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
+
+
+def test__api_get_upload_thumbnail__valid_upload__returns_200_jpeg():
+    image_bytes = _create_real_image()
+    upload_id = _create_upload(content=image_bytes, filename="photo.png")
+
+    response = client.get(f"/uploads/{upload_id}/thumbnail")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    thumb = Image.open(io.BytesIO(response.content))
+    assert max(thumb.size) == 200
+
+
+def test__api_get_upload_thumbnail__nonexistent_upload__returns_404():
+    response = client.get("/uploads/nonexistent/thumbnail")
+
+    assert response.status_code == 404
+
+
+def test__api_get_upload_thumbnail__cached_on_second_request__same_content():
+    image_bytes = _create_real_image()
+    upload_id = _create_upload(content=image_bytes, filename="photo.png")
+
+    first = client.get(f"/uploads/{upload_id}/thumbnail")
+    second = client.get(f"/uploads/{upload_id}/thumbnail")
+
+    assert first.content == second.content
+
+
+def test__api_get_upload_thumbnail__after_delete__returns_404():
+    image_bytes = _create_real_image()
+    upload_id = _create_upload(content=image_bytes, filename="photo.png")
+
+    client.get(f"/uploads/{upload_id}/thumbnail")
+    client.delete(f"/uploads/{upload_id}", headers=get_auth_headers())
+
+    response = client.get(f"/uploads/{upload_id}/thumbnail")
+    assert response.status_code == 404
