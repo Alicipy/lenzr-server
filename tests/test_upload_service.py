@@ -1,4 +1,5 @@
 import os
+from unittest.mock import MagicMock
 
 import pytest
 from sqlmodel import select
@@ -6,7 +7,11 @@ from sqlmodel import select
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
 from lenzr_server.models.uploads import UploadMetaData
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
-from lenzr_server.upload_service import AlreadyExistingException, NotFoundException, UploadService
+from lenzr_server.upload_service import (
+    UploadAlreadyExistingException,
+    UploadNotFoundException,
+    UploadService,
+)
 
 
 @pytest.fixture
@@ -54,8 +59,38 @@ def test__add_upload__duplicate_entry__raises_already_existing_exception(
     content_type = "text/plain"
     upload_service.add_upload(content, content_type)
 
-    with pytest.raises(AlreadyExistingException):
+    with pytest.raises(UploadAlreadyExistingException):
         upload_service.add_upload(content, content_type)
+
+
+def test__add_upload__file_write_fails__no_dangling_db_record(
+    database_session, id_creator, tmp_path
+):
+    file_storage = OnDiskFileStorage(tmp_path)
+    file_storage.add_file = MagicMock(side_effect=OSError("disk full"))
+    service = UploadService(file_storage, database_session, id_creator)
+
+    with pytest.raises(OSError):
+        service.add_upload(b"test_content", "text/plain")
+
+    result = database_session.exec(select(UploadMetaData)).first()
+    assert result is None
+
+
+def test__add_upload__duplicate_entry__cleans_up_orphan_file(
+    upload_service, file_storage, id_creator
+):
+    content = b"test_content"
+    upload_service.add_upload(content, "text/plain")
+
+    upload_id = id_creator.create_upload_id(content)
+    file_path = os.path.join(file_storage._base_path, upload_id)
+    os.remove(file_path)
+
+    with pytest.raises(UploadAlreadyExistingException):
+        upload_service.add_upload(content, "text/plain")
+
+    assert not os.path.exists(file_path)
 
 
 def test__get_upload__valid_id__returns_content_and_type(
@@ -72,7 +107,7 @@ def test__get_upload__valid_id__returns_content_and_type(
 
 
 def test__get_upload__missing_database_entry__raises_not_found_exception(upload_service):
-    with pytest.raises(NotFoundException):
+    with pytest.raises(UploadNotFoundException):
         upload_service.get_upload("missing_upload_id")
 
 
@@ -97,7 +132,7 @@ def test__delete_upload__valid_id__deletes_from_database_and_disk(
 
 
 def test__delete_upload__missing_id__raises_upload_not_found_exception(upload_service):
-    with pytest.raises(NotFoundException):
+    with pytest.raises(UploadNotFoundException):
         upload_service.delete_upload("missing_upload_id")
 
 

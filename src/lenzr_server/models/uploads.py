@@ -1,5 +1,6 @@
 import datetime
 import uuid
+from functools import partial
 
 from sqlmodel import Field, SQLModel
 
@@ -14,17 +15,7 @@ class UploadMetaDataBase(LenzrServerModel):
 
 class UploadMetaData(UploadMetaDataBase, table=True):
     pk: uuid.UUID | None = Field(default_factory=uuid.uuid4, primary_key=True)
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    created_at: datetime.datetime = Field(
+        default_factory=partial(datetime.datetime.now, datetime.UTC)
+    )
     content_type: str = Field(max_length=32)
-
-
-class UploadMetaDataCreateResponse(UploadMetaDataBase):
-    pass
-
-
-class UploadMetaDataPublicResponse(UploadMetaDataBase):
-    pass
-
-
-class UploadMetaDataDeleteResponse(UploadMetaDataBase):
-    pass

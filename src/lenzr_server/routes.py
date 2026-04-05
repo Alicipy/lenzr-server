@@ -2,20 +2,21 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
 from lenzr_server.dependencies import check_login_valid, get_upload_service
-from lenzr_server.models.uploads import (
+from lenzr_server.responses import NOT_FOUND_RESPONSES, ImageResponse
+from lenzr_server.schemas import (
+    ErrorResponse,
     UploadMetaDataCreateResponse,
     UploadMetaDataDeleteResponse,
     UploadMetaDataPublicResponse,
 )
-from lenzr_server.schemas import ErrorResponse, ImageResponse
 from lenzr_server.types import UploadID
-from lenzr_server.upload_service import AlreadyExistingException, NotFoundException, UploadService
+from lenzr_server.upload_service import UploadAlreadyExistingException, UploadService
 
-upload_router = APIRouter()
+upload_router = APIRouter(prefix="/uploads", tags=["Uploads"])
 
 
 @upload_router.post(
-    "/uploads",
+    "",
     summary="Upload a file",
     description="Upload a file to the server and receive an upload ID",
     response_model=UploadMetaDataCreateResponse,
@@ -44,7 +45,7 @@ async def upload_file(
     try:
         upload = upload_service.add_upload(content, content_type)
         created = True
-    except AlreadyExistingException as aee:
+    except UploadAlreadyExistingException as aee:
         upload = UploadMetaDataPublicResponse(upload_id=aee.upload_id)
         created = False
 
@@ -53,7 +54,7 @@ async def upload_file(
 
 
 @upload_router.get(
-    "/uploads/{upload_id}",
+    "/{upload_id}",
     summary="Get image",
     description="Download an uploaded image by ID",
     response_class=ImageResponse,
@@ -62,23 +63,19 @@ async def upload_file(
         200: {
             "description": "Image content",
         },
-        404: {"description": "Upload not found", "model": ErrorResponse},
+        **NOT_FOUND_RESPONSES,
     },
 )
 async def get_upload(
     upload_id: UploadID,
     upload_service: UploadService = Depends(get_upload_service),
 ):
-    try:
-        content, content_type = upload_service.get_upload(upload_id)
-    except NotFoundException:
-        raise HTTPException(status_code=404, detail="Upload not found")
-
+    content, content_type = upload_service.get_upload(upload_id)
     return ImageResponse(content=content, media_type=content_type)
 
 
 @upload_router.delete(
-    "/uploads/{upload_id}",
+    "/{upload_id}",
     summary="Delete image",
     description="Delete an uploaded image by ID",
     status_code=200,
@@ -86,7 +83,7 @@ async def get_upload(
         200: {
             "description": "Image deleted",
         },
-        404: {"description": "Upload not found", "model": ErrorResponse},
+        **NOT_FOUND_RESPONSES,
     },
     response_model=UploadMetaDataDeleteResponse,
 )
@@ -94,14 +91,11 @@ async def delete_upload(
     upload_id: UploadID,
     upload_service: UploadService = Depends(get_upload_service),
 ):
-    try:
-        return upload_service.delete_upload(upload_id)
-    except NotFoundException:
-        raise HTTPException(status_code=404, detail="Upload not found")
+    return upload_service.delete_upload(upload_id)
 
 
 @upload_router.get(
-    "/uploads",
+    "",
     summary="List all uploads",
     description="Get a list of all upload IDs currently stored on the server in "
     "descending order of upload time.",
