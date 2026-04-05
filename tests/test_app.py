@@ -127,7 +127,7 @@ def test_api_delete_upload_upload_id__delete_upload_after_post_id__returns_200()
     response.raise_for_status()
     upload_id = response.json()["upload_id"]
 
-    response = client.delete(f"/uploads/{upload_id}")
+    response = client.delete(f"/uploads/{upload_id}", headers=get_auth_headers())
     assert response.status_code == 200
 
 
@@ -138,9 +138,21 @@ def test_api_delete_upload_upload_id__delete_nonexistent_upload_returns_404():
         headers=get_auth_headers(),
     )
 
-    response = client.delete("/uploads/123")
+    response = client.delete("/uploads/123", headers=get_auth_headers())
     assert response.status_code == 404
     assert response.json()["detail"] == "Upload not found"
+
+
+def test_api_delete_upload_upload_id__without_auth__returns_401():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        headers=get_auth_headers(),
+    )
+    upload_id = response.json()["upload_id"]
+
+    response = client.delete(f"/uploads/{upload_id}")
+    assert response.status_code == 401
 
 
 def test__api_get_uploads__get_uploads_after_post_multiple_files__returns_200_with_ids():
