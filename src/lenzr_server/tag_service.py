@@ -67,7 +67,7 @@ class TagService:
         for name in unique_names:
             self._database_session.add(UploadTag(upload_pk=upload_pk, tag_pk=tag_map[name].pk))
 
-        self._database_session.commit()
+        self._database_session.flush()
         return unique_names
 
     def get_upload_with_tags(self, upload_id: UploadID) -> UploadWithTags:

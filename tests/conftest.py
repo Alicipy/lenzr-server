@@ -14,8 +14,10 @@ def database_session():
     engine = create_engine("sqlite:///:memory:")
     event.listen(engine, "connect", lambda conn, _: conn.execute("PRAGMA foreign_keys=ON"))
     SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
+    with Session(engine, expire_on_commit=False) as session:
         yield session
+        if session.is_active:
+            session.commit()
     SQLModel.metadata.drop_all(engine)
 
 

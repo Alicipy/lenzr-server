@@ -26,8 +26,13 @@ def get_file_storage():
 
 
 def get_db_session():
-    with Session(engine) as session:
-        yield session
+    with Session(engine, expire_on_commit=False) as session:
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
 
 
 def get_upload_service(
