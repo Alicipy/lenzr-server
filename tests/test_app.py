@@ -216,3 +216,396 @@ def test__api_get_uploads__pagination(
     assert response.status_code == 200
     upload_ids = {upload["upload_id"] for upload in response.json()}
     assert upload_ids == expected_upload_ids
+
+
+def _create_upload(content: bytes = b"Hello, world!", filename: str = "test.png"):
+    response = client.post(
+        "/uploads",
+        files={"upload": (filename, content, "image/png")},
+        headers=get_auth_headers(),
+    )
+    response.raise_for_status()
+    return response.json()["upload_id"]
+
+
+def test__api_put_upload_tags__set_tags__returns_200_with_tags():
+    upload_id = _create_upload()
+
+    response = client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["upload_id"] == upload_id
+    assert sorted(data["tags"]) == ["landscape", "nature"]
+    assert "created_at" in data
+    assert data["content_type"] == "image/png"
+
+
+def test__api_put_upload_tags__nonexistent_upload__returns_404():
+    response = client.put(
+        "/uploads/nonexistent/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 404
+
+
+def test__api_put_upload_tags__without_auth__returns_401():
+    upload_id = _create_upload()
+
+    response = client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape"]},
+    )
+
+    assert response.status_code == 401
+
+
+def test__api_put_upload_tags__invalid_tag_name__returns_422():
+    upload_id = _create_upload()
+
+    response = client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["INVALID"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 422
+
+
+def test__api_get_upload_tags__returns_200_with_tags():
+    upload_id = _create_upload()
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["upload_id"] == upload_id
+    assert sorted(data["tags"]) == ["landscape", "nature"]
+    assert "created_at" in data
+    assert data["content_type"] == "image/png"
+
+
+def test__api_get_upload_tags__no_tags__returns_200_with_empty_list():
+    upload_id = _create_upload()
+
+    response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+def test__api_get_upload_tags__nonexistent_upload__returns_404():
+    response = client.get(
+        "/uploads/nonexistent/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 404
+
+
+def test__api_get_upload_tags__without_auth__returns_401():
+    upload_id = _create_upload()
+
+    response = client.get(f"/uploads/{upload_id}/tags")
+
+    assert response.status_code == 401
+
+
+def test__api_put_upload_tags__replace_tags__get_reflects_new_tags():
+    upload_id = _create_upload()
+
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["urban", "night"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert sorted(response.json()["tags"]) == ["night", "urban"]
+
+
+def test__api_put_upload_tags__empty_list__clears_tags():
+    upload_id = _create_upload()
+
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+    response = client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": []},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+    get_response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+    assert get_response.json()["tags"] == []
+
+
+def test__api_get_uploads_search__and_logic__returns_matching_uploads():
+    upload_id1 = _create_upload(b"file1", "f1.png")
+    upload_id2 = _create_upload(b"file2", "f2.png")
+
+    client.put(
+        f"/uploads/{upload_id1}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+    client.put(
+        f"/uploads/{upload_id2}/tags",
+        json={"tags": ["landscape", "urban"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["upload_id"] == upload_id1
+
+
+def test__api_get_uploads_search__and_logic__response_includes_all_tags():
+    upload_id1 = _create_upload(b"file1", "f1.png")
+    _create_upload(b"file2", "f2.png")
+
+    client.put(
+        f"/uploads/{upload_id1}/tags",
+        json={"tags": ["landscape", "nature", "sunset"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["upload_id"] == upload_id1
+    assert sorted(data[0]["tags"]) == ["landscape", "nature", "sunset"]
+    assert "created_at" in data[0]
+    assert data[0]["content_type"] == "image/png"
+
+
+def test__api_get_uploads_search__single_tag__returns_all_matching():
+    upload_id1 = _create_upload(b"file1", "f1.png")
+    upload_id2 = _create_upload(b"file2", "f2.png")
+
+    client.put(
+        f"/uploads/{upload_id1}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+    client.put(
+        f"/uploads/{upload_id2}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+
+
+def test__api_get_uploads_search__invalid_tag_name__returns_422():
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["INVALID"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 422
+
+
+def test__api_get_uploads_search__no_matches__returns_empty():
+    _create_upload()
+
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["nonexistent"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test__api_get_uploads_search__without_auth__returns_401():
+    response = client.get(
+        "/uploads/search",
+        params={"tags": ["landscape"]},
+    )
+
+    assert response.status_code == 401
+
+
+def test__api_get_tags__returns_all_tags():
+    upload_id1 = _create_upload(b"file1", "f1.png")
+    upload_id2 = _create_upload(b"file2", "f2.png")
+
+    client.put(
+        f"/uploads/{upload_id1}/tags",
+        json={"tags": ["nature", "landscape"]},
+        headers=get_auth_headers(),
+    )
+    client.put(
+        f"/uploads/{upload_id2}/tags",
+        json={"tags": ["urban"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get("/tags", headers=get_auth_headers())
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == ["landscape", "nature", "urban"]
+
+
+def test__api_get_tags__empty__returns_empty():
+    response = client.get("/tags", headers=get_auth_headers())
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+def test__api_get_tags__without_auth__returns_401():
+    response = client.get("/tags")
+
+    assert response.status_code == 401
+
+
+def test__api_post_upload__with_tags__returns_201_with_tags():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["upload_id"] == "1"
+    assert sorted(data["tags"]) == ["landscape", "nature"]
+
+
+def test__api_post_upload__with_tags__tags_are_persisted():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+    upload_id = response.json()["upload_id"]
+
+    tags_response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert tags_response.status_code == 200
+    assert sorted(tags_response.json()["tags"]) == ["landscape", "nature"]
+
+
+def test__api_post_upload__without_tags__returns_201_with_empty_tags():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["tags"] == []
+
+
+def test__api_post_upload__duplicate_with_tags__returns_200_without_tags():
+    client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+def test__api_post_upload__with_invalid_tags__returns_422():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["INVALID"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 422
+
+
+def test__api_post_upload__with_duplicate_tags__persists_deduplicated():
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        params={"tags": ["landscape", "landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 201
+    upload_id = response.json()["upload_id"]
+
+    tags_response = client.get(
+        f"/uploads/{upload_id}/tags",
+        headers=get_auth_headers(),
+    )
+
+    assert sorted(tags_response.json()["tags"]) == ["landscape", "nature"]

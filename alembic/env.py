@@ -4,6 +4,7 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from lenzr_server.db import get_database_url
+from lenzr_server.models.tags import Tag, UploadTag  # noqa: F401
 from lenzr_server.models.uploads import LenzrServerModel
 
 # this is the Alembic Config object, which provides
