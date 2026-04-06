@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 
 import sqlalchemy.exc
-from sqlmodel import Session, desc, select
+from sqlmodel import Session, select
 
 from lenzr_server.exceptions import AlreadyExistingException, NotFoundException
 from lenzr_server.file_storages.file_storage import FileID, FileStorage
@@ -100,15 +100,3 @@ class UploadService:
             raise UploadNotFoundException()
 
         return upload
-
-    def list_uploads(self, offset: int = 0, limit: int = 10) -> list[UploadMetaData]:
-        query = (
-            select(UploadMetaData)
-            .order_by(desc(UploadMetaData.created_at))
-            .offset(offset)
-            .limit(limit)
-        )
-
-        ids = self._database_session.exec(query).all()
-
-        return ids

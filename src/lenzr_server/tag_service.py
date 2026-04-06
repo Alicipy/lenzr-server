@@ -84,26 +84,7 @@ class TagService:
         upload = self._get_upload(upload_id)
         return self._get_tags_by_upload_pk(upload.pk)
 
-    def search_by_tags(
-        self, tag_names: list[TagName], offset: int = 0, limit: int = 10
-    ) -> list[UploadWithTags]:
-        if not tag_names:
-            return []
-
-        unique_names = list(dict.fromkeys(tag_names))
-
-        # AND logic: only uploads that have ALL requested tags
-        query = (
-            select(UploadMetaData)
-            .join(UploadTag, UploadTag.upload_pk == UploadMetaData.pk)
-            .join(Tag, Tag.pk == UploadTag.tag_pk)
-            .where(Tag.name.in_(unique_names))
-            .group_by(UploadMetaData.pk)
-            .having(sa.func.count(sa.distinct(Tag.name)) == len(unique_names))
-            .offset(offset)
-            .limit(limit)
-        )
-        uploads = self._database_session.exec(query).all()
+    def _to_uploads_with_tags(self, uploads: list[UploadMetaData]) -> list[UploadWithTags]:
         if not uploads:
             return []
 
@@ -126,6 +107,29 @@ class TagService:
             )
             for upload in uploads
         ]
+
+    def list_with_tags(
+        self,
+        tag_names: list[TagName] | None = None,
+        offset: int = 0,
+        limit: int = 10,
+    ) -> list[UploadWithTags]:
+        query = select(UploadMetaData)
+
+        if tag_names:
+            unique_names = list(dict.fromkeys(tag_names))
+            # AND logic: only uploads that have ALL requested tags
+            query = (
+                query.join(UploadTag, UploadTag.upload_pk == UploadMetaData.pk)
+                .join(Tag, Tag.pk == UploadTag.tag_pk)
+                .where(Tag.name.in_(unique_names))
+                .group_by(UploadMetaData.pk)
+                .having(sa.func.count(sa.distinct(Tag.name)) == len(unique_names))
+            )
+
+        query = query.order_by(UploadMetaData.created_at.desc()).offset(offset).limit(limit)
+        uploads = self._database_session.exec(query).all()
+        return self._to_uploads_with_tags(uploads)
 
     def list_all_tags(self, offset: int = 0, limit: int = 100) -> list[TagName]:
         query = select(Tag.name).order_by(Tag.name).offset(offset).limit(limit)

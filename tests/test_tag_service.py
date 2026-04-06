@@ -86,7 +86,7 @@ def test__set_tags__reuses_existing_tag_rows(tag_service, database_session):
     assert len(tags) == 1
 
 
-def test__search_by_tags__and_logic__returns_matching_uploads(tag_service, database_session):
+def test__list_with_tags__and_logic__returns_matching_uploads(tag_service, database_session):
     upload1 = UploadMetaData(upload_id="upload1", content_type="image/png")
     upload2 = UploadMetaData(upload_id="upload2", content_type="image/png")
     database_session.add(upload1)
@@ -96,7 +96,7 @@ def test__search_by_tags__and_logic__returns_matching_uploads(tag_service, datab
     tag_service.set_tags("upload1", ["landscape", "nature", "sunset"])
     tag_service.set_tags("upload2", ["landscape", "urban"])
 
-    results = tag_service.search_by_tags(["landscape", "nature"])
+    results = tag_service.list_with_tags(["landscape", "nature"])
 
     assert len(results) == 1
     assert results[0].upload_id == "upload1"
@@ -105,7 +105,7 @@ def test__search_by_tags__and_logic__returns_matching_uploads(tag_service, datab
     assert results[0].created_at is not None
 
 
-def test__search_by_tags__single_tag__returns_all_matching(tag_service, database_session):
+def test__list_with_tags__single_tag__returns_all_matching(tag_service, database_session):
     upload1 = UploadMetaData(upload_id="upload1", content_type="image/png")
     upload2 = UploadMetaData(upload_id="upload2", content_type="image/png")
     database_session.add(upload1)
@@ -115,29 +115,48 @@ def test__search_by_tags__single_tag__returns_all_matching(tag_service, database
     tag_service.set_tags("upload1", ["landscape"])
     tag_service.set_tags("upload2", ["landscape", "urban"])
 
-    results = tag_service.search_by_tags(["landscape"])
+    results = tag_service.list_with_tags(["landscape"])
 
     assert len(results) == 2
     upload_ids = sorted([r.upload_id for r in results])
     assert upload_ids == ["upload1", "upload2"]
 
 
-def test__search_by_tags__no_matches__returns_empty(tag_service, database_session):
+def test__list_with_tags__no_matches__returns_empty(tag_service, database_session):
     upload1 = UploadMetaData(upload_id="upload1", content_type="image/png")
     database_session.add(upload1)
     database_session.commit()
 
     tag_service.set_tags("upload1", ["landscape"])
 
-    results = tag_service.search_by_tags(["nonexistent"])
+    results = tag_service.list_with_tags(["nonexistent"])
 
     assert results == []
 
 
-def test__search_by_tags__empty_input__returns_empty(tag_service):
-    results = tag_service.search_by_tags([])
+def test__list_with_tags__empty_input__returns_all_uploads(tag_service, database_session):
+    upload1 = UploadMetaData(upload_id="upload1", content_type="image/png")
+    upload2 = UploadMetaData(upload_id="upload2", content_type="image/png")
+    database_session.add(upload1)
+    database_session.add(upload2)
+    database_session.commit()
 
-    assert results == []
+    results = tag_service.list_with_tags([])
+
+    assert sorted(r.upload_id for r in results) == ["upload1", "upload2"]
+
+
+def test__list_with_tags__orders_by_created_at_desc(tag_service, database_session):
+    first = UploadMetaData(upload_id="first", content_type="image/png")
+    second = UploadMetaData(upload_id="second", content_type="image/png")
+    database_session.add(first)
+    database_session.commit()
+    database_session.add(second)
+    database_session.commit()
+
+    results = tag_service.list_with_tags([])
+
+    assert [r.upload_id for r in results] == ["second", "first"]
 
 
 def test__list_all_tags__returns_sorted_tag_names(tag_service, database_session):
@@ -178,14 +197,14 @@ def test__get_tags__after_clear__returns_empty(tag_service, upload):
     assert result == []
 
 
-def test__search_by_tags__duplicate_input__deduplicates(tag_service, database_session):
+def test__list_with_tags__duplicate_input__deduplicates(tag_service, database_session):
     upload1 = UploadMetaData(upload_id="upload1", content_type="image/png")
     database_session.add(upload1)
     database_session.commit()
 
     tag_service.set_tags("upload1", ["landscape"])
 
-    results = tag_service.search_by_tags(["landscape", "landscape"])
+    results = tag_service.list_with_tags(["landscape", "landscape"])
 
     assert len(results) == 1
     assert results[0].upload_id == "upload1"
