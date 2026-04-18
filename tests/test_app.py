@@ -1,15 +1,20 @@
 import base64
 import io
+import json
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlmodel import SQLModel
 
 from lenzr_server.db import engine
-from lenzr_server.dependencies import get_id_creator
+from lenzr_server.dependencies import get_id_creator, get_webhook_notifier
 from lenzr_server.main import app
 from lenzr_server.upload_id_creators.counting_id_creator import CountingIdCreator
+from lenzr_server.webhook import HttpWebhookNotifier
+
+WEBHOOK_URL = "http://localhost/hook"
 
 creator = CountingIdCreator()
 
@@ -669,3 +674,63 @@ def test__api_get_upload_thumbnail__corrupted_image_bytes__returns_422(client):
     response = client.get(f"/uploads/{upload_id}/thumbnail")
 
     assert response.status_code == 422
+
+
+@pytest.fixture
+def webhook_route(respx_mock):
+    return respx_mock.post(WEBHOOK_URL).mock(return_value=httpx.Response(200))
+
+
+@pytest.fixture
+def webhook_notifier(webhook_route):
+    with httpx.Client() as http_client:
+        app.dependency_overrides[get_webhook_notifier] = lambda: HttpWebhookNotifier(
+            WEBHOOK_URL, client=http_client
+        )
+        yield
+        app.dependency_overrides.pop(get_webhook_notifier, None)
+
+
+def test__api_post_upload__with_webhook__calls_webhook_with_upload_id(
+    client, webhook_route, webhook_notifier
+):
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"webhook test content", "image/png")},
+        headers=get_auth_headers(),
+    )
+    assert response.status_code == 201
+
+    assert webhook_route.called
+    body = json.loads(webhook_route.calls.last.request.content)
+    assert body["upload_id"] == response.json()["upload_id"]
+    assert body["event"] == "upload.created"
+
+
+def test__api_post_upload__duplicate_with_webhook__does_not_call_webhook(
+    client, webhook_notifier, webhook_route
+):
+    client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"dupe webhook test", "image/png")},
+        headers=get_auth_headers(),
+    )
+    webhook_route.reset()
+
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"dupe webhook test", "image/png")},
+        headers=get_auth_headers(),
+    )
+    assert response.status_code == 200
+    assert not webhook_route.called
+
+
+def test__api_post_upload__without_webhook_url__does_not_call_webhook(client, webhook_route):
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"no webhook test", "image/png")},
+        headers=get_auth_headers(),
+    )
+    assert response.status_code == 201
+    assert not webhook_route.called

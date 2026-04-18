@@ -10,6 +10,7 @@ A REST server to host, tag, and search images.
 - List all tags in use across uploads
 - Auto-generated JPEG thumbnails
 - Pagination on list and search endpoints
+- Optional webhook notifications on new uploads
 - HTTP Basic authentication
 - OpenAPI documentation at `/docs`
 
@@ -40,6 +41,15 @@ cp .env.example .env
 Afterward, look into it and modify accordingly.
 
 You _at least_ want to change the username and password for server access.
+
+#### Webhook notifications
+
+Lenzr can notify an external service when a new image is uploaded by sending a POST request
+with the `upload_id` to a configured URL. The webhook is fire-and-forget and does not affect
+the upload response.
+
+Set `WEBHOOK_URL` to enable this feature. Optionally set `WEBHOOK_SECRET` to enable
+HMAC-SHA256 request signing via the `X-Lenzr-Signature` header.
 
 ### `docker-compose`
 

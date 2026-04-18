@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
 from lenzr_server.dependencies import (
@@ -6,6 +8,7 @@ from lenzr_server.dependencies import (
     get_tag_service,
     get_thumbnail_service,
     get_upload_service,
+    get_webhook_notifier,
 )
 from lenzr_server.responses import NOT_FOUND_RESPONSES, ImageResponse
 from lenzr_server.schemas import (
@@ -14,13 +17,13 @@ from lenzr_server.schemas import (
     TagsUpdateRequest,
     UploadMetaDataCreateResponse,
     UploadMetaDataDeleteResponse,
-    UploadMetaDataPublicResponse,
     UploadWithTagsResponse,
 )
 from lenzr_server.tag_service import TagService
 from lenzr_server.thumbnail_service import InvalidImageException, ThumbnailService
 from lenzr_server.types import TagName, UploadID
 from lenzr_server.upload_service import UploadAlreadyExistingException, UploadService
+from lenzr_server.webhook import WebhookNotifier
 
 upload_router = APIRouter(prefix="/uploads", tags=["Uploads"])
 
@@ -43,10 +46,12 @@ upload_router = APIRouter(prefix="/uploads", tags=["Uploads"])
 )
 async def upload_file(
     response: Response,
+    background_tasks: BackgroundTasks,
     upload: UploadFile = File(..., description="Image file to upload", media_type="image/*"),
     tags: list[TagName] = Query(default=[]),
     upload_service: UploadService = Depends(get_upload_service),
     tag_service: TagService = Depends(get_tag_service),
+    webhook_notifier: WebhookNotifier = Depends(get_webhook_notifier),
     _login_valid: None = Depends(check_login_valid),
 ):
     content = await upload.read()
@@ -55,18 +60,21 @@ async def upload_file(
         raise HTTPException(status_code=400, detail="Bad request - invalid file")
 
     try:
-        upload_metadata = upload_service.add_upload(content, content_type)
+        upload_id = upload_service.add_upload(content, content_type).upload_id
         created = True
     except UploadAlreadyExistingException as aee:
-        upload_metadata = UploadMetaDataPublicResponse(upload_id=aee.upload_id)
+        upload_id = aee.upload_id
         created = False
 
     result_tags: list[TagName] = []
     if tags and created:
-        result_tags = tag_service.set_tags(upload_metadata.upload_id, tags)
+        result_tags = tag_service.set_tags(upload_id, tags)
+
+    if created:
+        background_tasks.add_task(webhook_notifier.send, upload_id, datetime.now(UTC))
 
     response.status_code = 201 if created else 200
-    return UploadMetaDataCreateResponse(upload_id=upload_metadata.upload_id, tags=result_tags)
+    return UploadMetaDataCreateResponse(upload_id=upload_id, tags=result_tags)
 
 
 @upload_router.get(

@@ -30,7 +30,11 @@ def database_session():
 
 @pytest.fixture(autouse=True)
 def set_env_variables(mocker):
-    mocker.patch.dict(os.environ, {"LENZR_USERNAME": "test_user", "LENZR_PASSWORD": "test_pass"})
+    mocker.patch.dict(
+        os.environ,
+        {"LENZR_USERNAME": "test_user", "LENZR_PASSWORD": "test_pass"},
+    )
+    mocker.patch.dict(os.environ, {"WEBHOOK_URL": "", "WEBHOOK_SECRET": ""}, clear=False)
 
 
 @pytest.fixture
