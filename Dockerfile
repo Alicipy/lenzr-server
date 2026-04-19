@@ -36,7 +36,7 @@ RUN git config --global --add safe.directory /app
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
 RUN --mount=type=cache,target=/appuser/.cache/uv \
     --mount=type=bind,source=.git,target=/app/.git \
-    uv sync --frozen --no-install-project
+    uv sync --frozen --no-dev --no-install-project
 
 COPY ./README.md ./alembic.ini ./
 COPY ./alembic ./alembic
@@ -44,6 +44,6 @@ COPY ./src ./src
 
 RUN --mount=type=cache,target=/appuser/.cache/uv \
     --mount=type=bind,source=.git,target=/app/.git \
-    uv sync --frozen
+    uv sync --frozen --no-dev
 
 CMD ["uvicorn", "lenzr_server.main:app", "--host", "0.0.0.0", "--port", "8000"]
