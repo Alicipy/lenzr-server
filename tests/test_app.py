@@ -11,9 +11,6 @@ from lenzr_server.dependencies import get_id_creator
 from lenzr_server.main import app
 from lenzr_server.upload_id_creators.counting_id_creator import CountingIdCreator
 
-client = TestClient(app)
-
-
 creator = CountingIdCreator()
 
 
@@ -41,7 +38,26 @@ def get_auth_headers(username: str = "test_user", password: str = "test_pass"):
     return {"Authorization": f"Basic {credentials}"}
 
 
-def test__api_post_upload__upload_image_file__returns_201_with_id():
+def _create_upload(
+    client: TestClient, content: bytes = b"Hello, world!", filename: str = "test.png"
+) -> str:
+    response = client.post(
+        "/uploads",
+        files={"upload": (filename, content, "image/png")},
+        headers=get_auth_headers(),
+    )
+    response.raise_for_status()
+    return response.json()["upload_id"]
+
+
+def _create_real_image(width: int = 800, height: int = 600) -> bytes:
+    image = Image.new("RGB", (width, height), color="blue")
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
+
+
+def test__api_post_upload__upload_image_file__returns_201_with_id(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -52,7 +68,7 @@ def test__api_post_upload__upload_image_file__returns_201_with_id():
     assert response.json()["upload_id"] == "1"
 
 
-def test__api_post_upload__upload_image_file_twice__returns_201_and_200_with_id():
+def test__api_post_upload__upload_image_file_twice__returns_201_and_200_with_id(client):
     response1 = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -68,14 +84,14 @@ def test__api_post_upload__upload_image_file_twice__returns_201_and_200_with_id(
     assert response1.json()["upload_id"] == response2.json()["upload_id"]
 
 
-def test__api_post_upload__upload_image_file_without_auth__returns_401_unauthorized():
+def test__api_post_upload__upload_image_file_without_auth__returns_401_unauthorized(client):
     response = client.post(
         "/uploads", files={"upload": ("test.png", b"Hello, world!", "image/png")}
     )
     assert response.status_code == 401
 
 
-def test__api_post_upload__upload_txt_file__returns_400_bad_request():
+def test__api_post_upload__upload_txt_file__returns_400_bad_request(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.txt", b"Hello, world!", "text/plain")},
@@ -85,20 +101,19 @@ def test__api_post_upload__upload_txt_file__returns_400_bad_request():
     assert response.json()["detail"] == "Bad request - invalid file"
 
 
-def test__api_post_upload__upload_no_file_type__returns_400_bad_request():
+def test__api_post_upload__upload_no_file_type__returns_400_bad_request(client):
     response = client.post(
         "/uploads", files={"upload": ("test", b"Hello, world!")}, headers=get_auth_headers()
     )
     assert response.status_code == 400
 
 
-def test__api_post_upload__upload_no_file__returns_422_validation_error():
+def test__api_post_upload__upload_no_file__returns_422_validation_error(client):
     response = client.post("/uploads", headers=get_auth_headers())
     assert response.status_code == 422
 
 
-def test__api_get_upload_upload_id___get_upload_after_post_with_id__returns_200_with_data():
-    # Create a sample image file
+def test__api_get_upload_upload_id___get_upload_after_post_with_id__returns_200_with_data(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -114,13 +129,13 @@ def test__api_get_upload_upload_id___get_upload_after_post_with_id__returns_200_
     assert response.content == b"Hello, world!"
 
 
-def test__api_get_upload_upload_id__get_upload_with_invalid_id__returns_404():
+def test__api_get_upload_upload_id__get_upload_with_invalid_id__returns_404(client):
     response = client.get("/uploads/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Upload not found"
 
 
-def test_api_delete_upload_upload_id__delete_upload_after_post_id__returns_200():
+def test_api_delete_upload_upload_id__delete_upload_after_post_id__returns_200(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -133,8 +148,8 @@ def test_api_delete_upload_upload_id__delete_upload_after_post_id__returns_200()
     assert response.status_code == 200
 
 
-def test_api_delete_upload_upload_id__delete_nonexistent_upload_returns_404():
-    response = client.post(
+def test_api_delete_upload_upload_id__delete_nonexistent_upload_returns_404(client):
+    client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
         headers=get_auth_headers(),
@@ -145,7 +160,7 @@ def test_api_delete_upload_upload_id__delete_nonexistent_upload_returns_404():
     assert response.json()["detail"] == "Upload not found"
 
 
-def test_api_delete_upload_upload_id__without_auth__returns_401():
+def test_api_delete_upload_upload_id__without_auth__returns_401(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -157,7 +172,7 @@ def test_api_delete_upload_upload_id__without_auth__returns_401():
     assert response.status_code == 401
 
 
-def test__api_get_uploads__get_uploads_after_post_multiple_files__returns_200_with_ids():
+def test__api_get_uploads__get_uploads_after_post_multiple_files__returns_200_with_ids(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test1.png", b"File 1", "image/png")},
@@ -179,12 +194,12 @@ def test__api_get_uploads__get_uploads_after_post_multiple_files__returns_200_wi
     assert {"upload_id": "2"} in content
 
 
-def test__api_get_uploads__get_uploads_without_auth__returns_401_unauthorized():
+def test__api_get_uploads__get_uploads_without_auth__returns_401_unauthorized(client):
     response = client.get("/uploads")
     assert response.status_code == 401
 
 
-def test__api_get_uploads__get_uploads_with_no_files__returns_200_with_empty_list():
+def test__api_get_uploads__get_uploads_with_no_files__returns_200_with_empty_list(client):
     response = client.get("/uploads", headers=get_auth_headers())
 
     assert response.status_code == 200
@@ -195,21 +210,13 @@ def test__api_get_uploads__get_uploads_with_no_files__returns_200_with_empty_lis
     "offset,limit,expected_upload_ids",
     [
         pytest.param(None, None, {"5", "4", "3", "2", "1"}, id="all_default"),
-        pytest.param(
-            None,
-            2,
-            {
-                "5",
-                "4",
-            },
-            id="default_offset",
-        ),
+        pytest.param(None, 2, {"5", "4"}, id="default_offset"),
         pytest.param(2, None, {"3", "2", "1"}, id="default_limit"),
         pytest.param(1, 3, {"4", "3", "2"}, id="both_set"),
     ],
 )
 def test__api_get_uploads__pagination(
-    offset: int | None, limit: int | None, expected_upload_ids: set[str]
+    client, offset: int | None, limit: int | None, expected_upload_ids: set[str]
 ):
     for i in range(5):
         response = client.post(
@@ -232,18 +239,8 @@ def test__api_get_uploads__pagination(
     assert upload_ids == expected_upload_ids
 
 
-def _create_upload(content: bytes = b"Hello, world!", filename: str = "test.png"):
-    response = client.post(
-        "/uploads",
-        files={"upload": (filename, content, "image/png")},
-        headers=get_auth_headers(),
-    )
-    response.raise_for_status()
-    return response.json()["upload_id"]
-
-
-def test__api_put_upload_tags__set_tags__returns_200_with_tags():
-    upload_id = _create_upload()
+def test__api_put_upload_tags__set_tags__returns_200_with_tags(client):
+    upload_id = _create_upload(client)
 
     response = client.put(
         f"/uploads/{upload_id}/tags",
@@ -259,7 +256,7 @@ def test__api_put_upload_tags__set_tags__returns_200_with_tags():
     assert data["content_type"] == "image/png"
 
 
-def test__api_put_upload_tags__nonexistent_upload__returns_404():
+def test__api_put_upload_tags__nonexistent_upload__returns_404(client):
     response = client.put(
         "/uploads/nonexistent/tags",
         json={"tags": ["landscape"]},
@@ -269,8 +266,8 @@ def test__api_put_upload_tags__nonexistent_upload__returns_404():
     assert response.status_code == 404
 
 
-def test__api_put_upload_tags__without_auth__returns_401():
-    upload_id = _create_upload()
+def test__api_put_upload_tags__without_auth__returns_401(client):
+    upload_id = _create_upload(client)
 
     response = client.put(
         f"/uploads/{upload_id}/tags",
@@ -280,8 +277,8 @@ def test__api_put_upload_tags__without_auth__returns_401():
     assert response.status_code == 401
 
 
-def test__api_put_upload_tags__invalid_tag_name__returns_422():
-    upload_id = _create_upload()
+def test__api_put_upload_tags__invalid_tag_name__returns_422(client):
+    upload_id = _create_upload(client)
 
     response = client.put(
         f"/uploads/{upload_id}/tags",
@@ -292,8 +289,8 @@ def test__api_put_upload_tags__invalid_tag_name__returns_422():
     assert response.status_code == 422
 
 
-def test__api_get_upload_tags__returns_200_with_tags():
-    upload_id = _create_upload()
+def test__api_get_upload_tags__returns_200_with_tags(client):
+    upload_id = _create_upload(client)
     client.put(
         f"/uploads/{upload_id}/tags",
         json={"tags": ["landscape", "nature"]},
@@ -313,8 +310,8 @@ def test__api_get_upload_tags__returns_200_with_tags():
     assert data["content_type"] == "image/png"
 
 
-def test__api_get_upload_tags__no_tags__returns_200_with_empty_list():
-    upload_id = _create_upload()
+def test__api_get_upload_tags__no_tags__returns_200_with_empty_list(client):
+    upload_id = _create_upload(client)
 
     response = client.get(
         f"/uploads/{upload_id}/tags",
@@ -325,7 +322,7 @@ def test__api_get_upload_tags__no_tags__returns_200_with_empty_list():
     assert response.json()["tags"] == []
 
 
-def test__api_get_upload_tags__nonexistent_upload__returns_404():
+def test__api_get_upload_tags__nonexistent_upload__returns_404(client):
     response = client.get(
         "/uploads/nonexistent/tags",
         headers=get_auth_headers(),
@@ -334,16 +331,16 @@ def test__api_get_upload_tags__nonexistent_upload__returns_404():
     assert response.status_code == 404
 
 
-def test__api_get_upload_tags__without_auth__returns_401():
-    upload_id = _create_upload()
+def test__api_get_upload_tags__without_auth__returns_401(client):
+    upload_id = _create_upload(client)
 
     response = client.get(f"/uploads/{upload_id}/tags")
 
     assert response.status_code == 401
 
 
-def test__api_put_upload_tags__replace_tags__get_reflects_new_tags():
-    upload_id = _create_upload()
+def test__api_put_upload_tags__replace_tags__get_reflects_new_tags(client):
+    upload_id = _create_upload(client)
 
     client.put(
         f"/uploads/{upload_id}/tags",
@@ -365,8 +362,8 @@ def test__api_put_upload_tags__replace_tags__get_reflects_new_tags():
     assert sorted(response.json()["tags"]) == ["night", "urban"]
 
 
-def test__api_put_upload_tags__empty_list__clears_tags():
-    upload_id = _create_upload()
+def test__api_put_upload_tags__empty_list__clears_tags(client):
+    upload_id = _create_upload(client)
 
     client.put(
         f"/uploads/{upload_id}/tags",
@@ -389,9 +386,9 @@ def test__api_put_upload_tags__empty_list__clears_tags():
     assert get_response.json()["tags"] == []
 
 
-def test__api_get_uploads_search__and_logic__returns_matching_uploads():
-    upload_id1 = _create_upload(b"file1", "f1.png")
-    upload_id2 = _create_upload(b"file2", "f2.png")
+def test__api_get_uploads_search__and_logic__returns_matching_uploads(client):
+    upload_id1 = _create_upload(client, b"file1", "f1.png")
+    upload_id2 = _create_upload(client, b"file2", "f2.png")
 
     client.put(
         f"/uploads/{upload_id1}/tags",
@@ -416,9 +413,9 @@ def test__api_get_uploads_search__and_logic__returns_matching_uploads():
     assert data[0]["upload_id"] == upload_id1
 
 
-def test__api_get_uploads_search__and_logic__response_includes_all_tags():
-    upload_id1 = _create_upload(b"file1", "f1.png")
-    _create_upload(b"file2", "f2.png")
+def test__api_get_uploads_search__and_logic__response_includes_all_tags(client):
+    upload_id1 = _create_upload(client, b"file1", "f1.png")
+    _create_upload(client, b"file2", "f2.png")
 
     client.put(
         f"/uploads/{upload_id1}/tags",
@@ -441,9 +438,9 @@ def test__api_get_uploads_search__and_logic__response_includes_all_tags():
     assert data[0]["content_type"] == "image/png"
 
 
-def test__api_get_uploads_search__single_tag__returns_all_matching():
-    upload_id1 = _create_upload(b"file1", "f1.png")
-    upload_id2 = _create_upload(b"file2", "f2.png")
+def test__api_get_uploads_search__single_tag__returns_all_matching(client):
+    upload_id1 = _create_upload(client, b"file1", "f1.png")
+    upload_id2 = _create_upload(client, b"file2", "f2.png")
 
     client.put(
         f"/uploads/{upload_id1}/tags",
@@ -467,7 +464,7 @@ def test__api_get_uploads_search__single_tag__returns_all_matching():
     assert len(data) == 2
 
 
-def test__api_get_uploads_search__invalid_tag_name__returns_422():
+def test__api_get_uploads_search__invalid_tag_name__returns_422(client):
     response = client.get(
         "/uploads/search",
         params={"tags": ["INVALID"]},
@@ -477,8 +474,8 @@ def test__api_get_uploads_search__invalid_tag_name__returns_422():
     assert response.status_code == 422
 
 
-def test__api_get_uploads_search__no_matches__returns_empty():
-    _create_upload()
+def test__api_get_uploads_search__no_matches__returns_empty(client):
+    _create_upload(client)
 
     response = client.get(
         "/uploads/search",
@@ -490,7 +487,7 @@ def test__api_get_uploads_search__no_matches__returns_empty():
     assert response.json() == []
 
 
-def test__api_get_uploads_search__without_auth__returns_401():
+def test__api_get_uploads_search__without_auth__returns_401(client):
     response = client.get(
         "/uploads/search",
         params={"tags": ["landscape"]},
@@ -499,9 +496,9 @@ def test__api_get_uploads_search__without_auth__returns_401():
     assert response.status_code == 401
 
 
-def test__api_get_tags__returns_all_tags():
-    upload_id1 = _create_upload(b"file1", "f1.png")
-    upload_id2 = _create_upload(b"file2", "f2.png")
+def test__api_get_tags__returns_all_tags(client):
+    upload_id1 = _create_upload(client, b"file1", "f1.png")
+    upload_id2 = _create_upload(client, b"file2", "f2.png")
 
     client.put(
         f"/uploads/{upload_id1}/tags",
@@ -520,20 +517,20 @@ def test__api_get_tags__returns_all_tags():
     assert response.json()["tags"] == ["landscape", "nature", "urban"]
 
 
-def test__api_get_tags__empty__returns_empty():
+def test__api_get_tags__empty__returns_empty(client):
     response = client.get("/tags", headers=get_auth_headers())
 
     assert response.status_code == 200
     assert response.json()["tags"] == []
 
 
-def test__api_get_tags__without_auth__returns_401():
+def test__api_get_tags__without_auth__returns_401(client):
     response = client.get("/tags")
 
     assert response.status_code == 401
 
 
-def test__api_post_upload__with_tags__returns_201_with_tags():
+def test__api_post_upload__with_tags__returns_201_with_tags(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -547,7 +544,7 @@ def test__api_post_upload__with_tags__returns_201_with_tags():
     assert sorted(data["tags"]) == ["landscape", "nature"]
 
 
-def test__api_post_upload__with_tags__tags_are_persisted():
+def test__api_post_upload__with_tags__tags_are_persisted(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -565,7 +562,7 @@ def test__api_post_upload__with_tags__tags_are_persisted():
     assert sorted(tags_response.json()["tags"]) == ["landscape", "nature"]
 
 
-def test__api_post_upload__without_tags__returns_201_with_empty_tags():
+def test__api_post_upload__without_tags__returns_201_with_empty_tags(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -576,7 +573,7 @@ def test__api_post_upload__without_tags__returns_201_with_empty_tags():
     assert response.json()["tags"] == []
 
 
-def test__api_post_upload__duplicate_with_tags__returns_200_without_tags():
+def test__api_post_upload__duplicate_with_tags__returns_200_without_tags(client):
     client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -595,7 +592,7 @@ def test__api_post_upload__duplicate_with_tags__returns_200_without_tags():
     assert response.json()["tags"] == []
 
 
-def test__api_post_upload__with_invalid_tags__returns_422():
+def test__api_post_upload__with_invalid_tags__returns_422(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -606,7 +603,7 @@ def test__api_post_upload__with_invalid_tags__returns_422():
     assert response.status_code == 422
 
 
-def test__api_post_upload__with_duplicate_tags__persists_deduplicated():
+def test__api_post_upload__with_duplicate_tags__persists_deduplicated(client):
     response = client.post(
         "/uploads",
         files={"upload": ("test.png", b"Hello, world!", "image/png")},
@@ -625,16 +622,8 @@ def test__api_post_upload__with_duplicate_tags__persists_deduplicated():
     assert sorted(tags_response.json()["tags"]) == ["landscape", "nature"]
 
 
-def _create_real_image(width: int = 800, height: int = 600) -> bytes:
-    image = Image.new("RGB", (width, height), color="blue")
-    output = io.BytesIO()
-    image.save(output, format="PNG")
-    return output.getvalue()
-
-
-def test__api_get_upload_thumbnail__valid_upload__returns_200_jpeg():
-    image_bytes = _create_real_image()
-    upload_id = _create_upload(content=image_bytes, filename="photo.png")
+def test__api_get_upload_thumbnail__valid_upload__returns_200_jpeg(client):
+    upload_id = _create_upload(client, _create_real_image(), "photo.png")
 
     response = client.get(f"/uploads/{upload_id}/thumbnail")
 
@@ -644,15 +633,14 @@ def test__api_get_upload_thumbnail__valid_upload__returns_200_jpeg():
     assert max(thumb.size) == 200
 
 
-def test__api_get_upload_thumbnail__nonexistent_upload__returns_404():
+def test__api_get_upload_thumbnail__nonexistent_upload__returns_404(client):
     response = client.get("/uploads/nonexistent/thumbnail")
 
     assert response.status_code == 404
 
 
-def test__api_get_upload_thumbnail__cached_on_second_request__same_content():
-    image_bytes = _create_real_image()
-    upload_id = _create_upload(content=image_bytes, filename="photo.png")
+def test__api_get_upload_thumbnail__cached_on_second_request__same_content(client):
+    upload_id = _create_upload(client, _create_real_image(), "photo.png")
 
     first = client.get(f"/uploads/{upload_id}/thumbnail")
     second = client.get(f"/uploads/{upload_id}/thumbnail")
@@ -660,12 +648,19 @@ def test__api_get_upload_thumbnail__cached_on_second_request__same_content():
     assert first.content == second.content
 
 
-def test__api_get_upload_thumbnail__after_delete__returns_404():
-    image_bytes = _create_real_image()
-    upload_id = _create_upload(content=image_bytes, filename="photo.png")
+def test__api_get_upload_thumbnail__after_delete__returns_404(client):
+    upload_id = _create_upload(client, _create_real_image(), "photo.png")
 
     client.get(f"/uploads/{upload_id}/thumbnail")
     client.delete(f"/uploads/{upload_id}", headers=get_auth_headers())
 
     response = client.get(f"/uploads/{upload_id}/thumbnail")
     assert response.status_code == 404
+
+
+def test__api_get_upload_thumbnail__corrupted_image_bytes__returns_422(client):
+    upload_id = _create_upload(client, b"not an image", "broken.png")
+
+    response = client.get(f"/uploads/{upload_id}/thumbnail")
+
+    assert response.status_code == 422

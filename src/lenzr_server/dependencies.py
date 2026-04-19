@@ -1,6 +1,6 @@
 import os
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlmodel import Session
 
@@ -9,7 +9,7 @@ from lenzr_server.db import engine
 from lenzr_server.file_storages.file_storage import FileStorage
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
 from lenzr_server.tag_service import TagService
-from lenzr_server.thumbnail_service import ThumbnailService
+from lenzr_server.thumbnail_service import InMemoryThumbnailService, ThumbnailService
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
 from lenzr_server.upload_id_creators.id_creator import IDCreator
 from lenzr_server.upload_service import UploadService
@@ -40,13 +40,12 @@ def get_upload_service(
     file_storage: FileStorage = Depends(get_file_storage),
     db_session: Session = Depends(get_db_session),
     upload_id_creator: IDCreator = Depends(get_id_creator),
-):
-    upload_service = UploadService(
+) -> UploadService:
+    return UploadService(
         file_storage=file_storage,
         database_session=db_session,
         upload_id_creator=upload_id_creator,
     )
-    return upload_service
 
 
 def get_tag_service(
@@ -55,11 +54,8 @@ def get_tag_service(
     return TagService(database_session=db_session)
 
 
-_thumbnail_service = ThumbnailService()
-
-
-def get_thumbnail_service() -> ThumbnailService:
-    return _thumbnail_service
+def get_thumbnail_service(request: Request) -> ThumbnailService:
+    return InMemoryThumbnailService(cache=request.app.state.thumbnail_cache)
 
 
 http_basic_auth = HTTPBasic()
