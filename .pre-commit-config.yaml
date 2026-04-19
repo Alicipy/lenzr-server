@@ -21,12 +21,14 @@ repos:
         - post-commit
         - pre-push
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.14.1
+  rev: v0.15.11
   hooks:
     - id: ruff-check
       args: [ --fix ]
+      language: system
     - id: ruff-format
       args: ["--line-length", "100"]
+      language: system
 - repo: https://github.com/facebook/pyrefly-pre-commit
   rev: 0.61.1
   hooks:
