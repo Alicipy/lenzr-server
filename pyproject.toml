@@ -26,6 +26,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "pre-commit>=4.3.0",
+    "pyrefly>=0.61.1",
     "pytest>=8.4.2",
     "pytest-mock>=3.15.1",
     "respx>=0.22",
@@ -56,4 +57,11 @@ script_location = "%(here)s/alembic"
 
 prepend_sys_path = [
     "."
+]
+
+[tool.pyrefly]
+python-version = "3.12"
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
 ]

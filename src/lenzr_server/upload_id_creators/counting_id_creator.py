@@ -13,7 +13,7 @@ class CountingIdCreator(IDCreator):
             self.memory[content] = self.id
 
         content_id = self.memory[content]
-        upload_id = UploadID(content_id)
+        upload_id: UploadID = str(content_id)
         return upload_id
 
     def reset(self):

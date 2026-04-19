@@ -27,3 +27,10 @@ repos:
       args: [ --fix ]
     - id: ruff-format
       args: ["--line-length", "100"]
+- repo: https://github.com/facebook/pyrefly-pre-commit
+  rev: 0.61.1
+  hooks:
+    - id: pyrefly-check
+      name: Pyrefly (type checking)
+      pass_filenames: false
+      language: system  # Use system-installed pyrefly
