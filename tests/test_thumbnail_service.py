@@ -1,133 +1,135 @@
 import io
 import threading
 
+import pytest
 from PIL import Image
 
-from lenzr_server.thumbnail_service import MAX_DIMENSION, ThumbnailService
+from lenzr_server.thumbnail_service import (
+    InMemoryThumbnailCache,
+    InMemoryThumbnailService,
+    InvalidImageException,
+)
+
+TEST_MAX_DIMENSION = 100
 
 
-def _create_test_image(width: int, height: int, image_format: str = "PNG") -> bytes:
-    image = Image.new("RGB", (width, height), color="red")
-    output = io.BytesIO()
-    image.save(output, format=image_format)
-    return output.getvalue()
+@pytest.fixture
+def sized_service(thumbnail_cache) -> InMemoryThumbnailService:
+    return InMemoryThumbnailService(cache=thumbnail_cache, max_dimension=TEST_MAX_DIMENSION)
 
 
-def test__get_thumbnail__large_image__resizes_to_max_dimension():
-    service = ThumbnailService()
-    original = _create_test_image(800, 600)
+@pytest.mark.parametrize(
+    "source_size,expected_size",
+    [
+        pytest.param((800, 600), (TEST_MAX_DIMENSION, 75), id="downscales_wide"),
+        pytest.param((600, 800), (75, TEST_MAX_DIMENSION), id="downscales_tall"),
+        pytest.param((50, 40), (50, 40), id="preserves_small"),
+        pytest.param((1000, 500), (TEST_MAX_DIMENSION, 50), id="preserves_aspect_ratio_wide"),
+        pytest.param((500, 1000), (50, TEST_MAX_DIMENSION), id="preserves_aspect_ratio_tall"),
+    ],
+)
+def test__get_thumbnail__sizing(sized_service, create_test_image, source_size, expected_size):
+    original = create_test_image(*source_size)
 
-    thumbnail_bytes = service.get_thumbnail("upload1", lambda: original)
+    thumbnail = sized_service.get_thumbnail("upload1", original)
 
-    thumb = Image.open(io.BytesIO(thumbnail_bytes))
-    assert max(thumb.size) == MAX_DIMENSION
+    thumb = Image.open(io.BytesIO(thumbnail.content))
+    assert thumb.size == expected_size
     assert thumb.format == "JPEG"
+    assert thumbnail.content_type == "image/jpeg"
 
 
-def test__get_thumbnail__small_image__does_not_upscale():
-    service = ThumbnailService()
-    original = _create_test_image(100, 80)
+@pytest.mark.parametrize(
+    "source_size,expected_size",
+    [
+        pytest.param((800, 400), (200, 100), id="wide"),
+        pytest.param((400, 800), (100, 200), id="tall"),
+    ],
+)
+def test__get_thumbnail__default_max_dimension(
+    thumbnail_service, create_test_image, source_size, expected_size
+):
+    original = create_test_image(*source_size)
 
-    thumbnail_bytes = service.get_thumbnail("upload1", lambda: original)
+    thumbnail = thumbnail_service.get_thumbnail("upload1", original)
 
-    thumb = Image.open(io.BytesIO(thumbnail_bytes))
-    assert thumb.size == (100, 80)
-
-
-def test__get_thumbnail__preserves_aspect_ratio():
-    service = ThumbnailService()
-    original = _create_test_image(1000, 500)
-
-    thumbnail_bytes = service.get_thumbnail("upload1", lambda: original)
-
-    thumb = Image.open(io.BytesIO(thumbnail_bytes))
-    assert thumb.size == (MAX_DIMENSION, 100)
+    thumb = Image.open(io.BytesIO(thumbnail.content))
+    assert thumb.size == expected_size
 
 
-def test__get_thumbnail__caches_result():
-    service = ThumbnailService()
-    original = _create_test_image(800, 600)
+def test__get_thumbnail__caches_result(thumbnail_service, create_test_image):
+    original = create_test_image(800, 600)
+    other = create_test_image(400, 300)
 
-    first = service.get_thumbnail("upload1", lambda: original)
-    # Pass different loader — should still return cached version
-    second = service.get_thumbnail("upload1", lambda: _create_test_image(400, 300))
+    first = thumbnail_service.get_thumbnail("upload1", original)
+    second = thumbnail_service.get_thumbnail("upload1", other)
 
-    assert first == second
-
-
-def test__get_thumbnail__different_ids__separate_cache_entries():
-    service = ThumbnailService()
-    img1 = _create_test_image(100, 100)
-    img2 = _create_test_image(50, 50)
-
-    thumb1 = service.get_thumbnail("upload1", lambda: img1)
-    thumb2 = service.get_thumbnail("upload2", lambda: img2)
-
-    assert thumb1 != thumb2
+    assert first.content == second.content
 
 
-def test__evict__removes_cache_entry():
-    service = ThumbnailService()
-    original = _create_test_image(800, 600)
+def test__get_thumbnail__different_ids__separate_cache_entries(
+    thumbnail_service, create_test_image
+):
+    img1 = create_test_image(100, 100)
+    img2 = create_test_image(50, 50)
 
-    service.get_thumbnail("upload1", lambda: original)
-    service.evict("upload1")
+    thumb1 = thumbnail_service.get_thumbnail("upload1", img1)
+    thumb2 = thumbnail_service.get_thumbnail("upload2", img2)
 
-    # After eviction, a new thumbnail is generated from new content
-    different = _create_test_image(100, 80)
-    thumb = service.get_thumbnail("upload1", lambda: different)
-    new_thumb = Image.open(io.BytesIO(thumb))
-    assert new_thumb.size == (100, 80)
+    assert thumb1.content != thumb2.content
 
 
-def test__evict__nonexistent_id__no_error():
-    service = ThumbnailService()
-    service.evict("nonexistent")
+def test__evict__removes_cache_entry(thumbnail_service, create_test_image):
+    original = create_test_image(800, 600)
+    thumbnail_service.get_thumbnail("upload1", original)
+    thumbnail_service.evict("upload1")
+
+    different = create_test_image(100, 80)
+    thumb = thumbnail_service.get_thumbnail("upload1", different)
+    assert Image.open(io.BytesIO(thumb.content)).size == (100, 80)
 
 
-def test__get_thumbnail__exceeds_max_cache_size__evicts_lru_entry():
-    service = ThumbnailService(max_cache_size=2)
-    img1 = _create_test_image(100, 100)
-    img2 = _create_test_image(200, 200)
-    img3 = _create_test_image(300, 300)
-
-    service.get_thumbnail("upload1", lambda: img1)
-    service.get_thumbnail("upload2", lambda: img2)
-    service.get_thumbnail("upload3", lambda: img3)
-
-    # upload1 (LRU) should have been evicted
-    assert "upload1" not in service._cache
-    assert "upload2" in service._cache
-    assert "upload3" in service._cache
+def test__evict__nonexistent_id__no_error(thumbnail_service):
+    thumbnail_service.evict("nonexistent")
 
 
-def test__get_thumbnail__cache_hit_refreshes_lru_order():
-    service = ThumbnailService(max_cache_size=2)
-    img1 = _create_test_image(100, 100)
-    img2 = _create_test_image(200, 200)
-    img3 = _create_test_image(300, 300)
+def test__get_thumbnail__exceeds_max_cache_size__evicts_lru_entry(create_test_image):
+    cache = InMemoryThumbnailCache(max_size=2)
+    service = InMemoryThumbnailService(cache=cache)
+    service.get_thumbnail("upload1", create_test_image(100, 100))
+    service.get_thumbnail("upload2", create_test_image(200, 200))
+    service.get_thumbnail("upload3", create_test_image(300, 300))
 
-    service.get_thumbnail("upload1", lambda: img1)
-    service.get_thumbnail("upload2", lambda: img2)
-    # Access upload1 again — moves it to most-recently-used
-    service.get_thumbnail("upload1", lambda: img1)
-    # This should evict upload2 (now LRU), not upload1
-    service.get_thumbnail("upload3", lambda: img3)
-
-    assert "upload1" in service._cache
-    assert "upload2" not in service._cache
-    assert "upload3" in service._cache
+    assert cache.get("upload1") is None
+    assert cache.get("upload2") is not None
+    assert cache.get("upload3") is not None
 
 
-def test__concurrent_get_and_evict__no_errors():
-    service = ThumbnailService(max_cache_size=5)
-    images = [_create_test_image(100 + i * 10, 100 + i * 10) for i in range(10)]
+def test__get_thumbnail__cache_hit_refreshes_lru_order(create_test_image):
+    cache = InMemoryThumbnailCache(max_size=2)
+    service = InMemoryThumbnailService(cache=cache)
+
+    service.get_thumbnail("upload1", create_test_image(100, 100))
+    service.get_thumbnail("upload2", create_test_image(200, 200))
+    # Access upload1 — moves it to most-recently-used
+    service.get_thumbnail("upload1", create_test_image(100, 100))
+    # Inserting upload3 should evict upload2, not upload1
+    service.get_thumbnail("upload3", create_test_image(300, 300))
+
+    assert cache.get("upload1") is not None
+    assert cache.get("upload2") is None
+    assert cache.get("upload3") is not None
+
+
+def test__concurrent_get_and_evict__no_errors(create_test_image):
+    service = InMemoryThumbnailService(cache=InMemoryThumbnailCache(max_size=5))
+    images = [create_test_image(100 + i * 10, 100 + i * 10) for i in range(10)]
     errors: list[Exception] = []
 
     def worker(i: int):
         try:
             upload_id = f"upload{i % 5}"
-            service.get_thumbnail(upload_id, lambda i=i: images[i % len(images)])
+            service.get_thumbnail(upload_id, images[i % len(images)])
             if i % 3 == 0:
                 service.evict(upload_id)
         except Exception as e:
@@ -142,15 +144,56 @@ def test__concurrent_get_and_evict__no_errors():
     assert errors == []
 
 
-def test__get_thumbnail__rgba_image__converts_to_rgb_jpeg():
-    service = ThumbnailService()
-    image = Image.new("RGBA", (400, 400), color=(255, 0, 0, 128))
-    output = io.BytesIO()
-    image.save(output, format="PNG")
-    original = output.getvalue()
+def test__get_thumbnail__rgba_image__converts_to_rgb_jpeg(thumbnail_service, create_test_image):
+    original = create_test_image(400, 400, mode="RGBA", color=(255, 0, 0, 128))
 
-    thumbnail_bytes = service.get_thumbnail("upload1", lambda: original)
+    thumbnail = thumbnail_service.get_thumbnail("upload1", original)
 
-    thumb = Image.open(io.BytesIO(thumbnail_bytes))
+    thumb = Image.open(io.BytesIO(thumbnail.content))
     assert thumb.mode == "RGB"
     assert thumb.format == "JPEG"
+
+
+@pytest.mark.parametrize(
+    "mode,color,image_format",
+    [
+        pytest.param("L", 128, "PNG", id="grayscale"),
+        pytest.param("LA", (128, 200), "PNG", id="grayscale_with_alpha"),
+        pytest.param("P", 5, "PNG", id="palette"),
+        pytest.param("CMYK", (0, 128, 255, 64), "JPEG", id="cmyk"),
+    ],
+)
+def test__get_thumbnail__non_rgb_modes__converts_to_rgb_jpeg(
+    thumbnail_service, create_test_image, mode, color, image_format
+):
+    original = create_test_image(400, 400, image_format=image_format, mode=mode, color=color)
+
+    thumbnail = thumbnail_service.get_thumbnail("upload1", original)
+
+    thumb = Image.open(io.BytesIO(thumbnail.content))
+    assert thumb.mode == "RGB"
+    assert thumb.format == "JPEG"
+
+
+def test__get_thumbnail__corrupted_bytes__raises_invalid_image(thumbnail_service):
+    with pytest.raises(InvalidImageException):
+        thumbnail_service.get_thumbnail("upload1", b"not an image")
+
+
+def test__get_thumbnail__truncated_bytes__raises_invalid_image(
+    thumbnail_service, create_test_image
+):
+    truncated = create_test_image(400, 400)[:50]
+
+    with pytest.raises(InvalidImageException):
+        thumbnail_service.get_thumbnail("upload1", truncated)
+
+
+def test__get_thumbnail__decompression_bomb__raises_invalid_image(
+    thumbnail_service, create_test_image, monkeypatch
+):
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+    oversized = create_test_image(400, 400)
+
+    with pytest.raises(InvalidImageException):
+        thumbnail_service.get_thumbnail("upload1", oversized)

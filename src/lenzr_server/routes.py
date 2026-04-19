@@ -18,7 +18,7 @@ from lenzr_server.schemas import (
     UploadWithTagsResponse,
 )
 from lenzr_server.tag_service import TagService
-from lenzr_server.thumbnail_service import THUMBNAIL_CONTENT_TYPE, ThumbnailService
+from lenzr_server.thumbnail_service import InvalidImageException, ThumbnailService
 from lenzr_server.types import TagName, UploadID
 from lenzr_server.upload_service import UploadAlreadyExistingException, UploadService
 
@@ -107,8 +107,8 @@ async def get_upload(
     upload_id: UploadID,
     upload_service: UploadService = Depends(get_upload_service),
 ):
-    content, content_type = upload_service.get_upload(upload_id)
-    return ImageResponse(content=content, media_type=content_type)
+    upload = upload_service.get_upload(upload_id)
+    return ImageResponse(content=upload.content, media_type=upload.content_type)
 
 
 @upload_router.get(
@@ -119,7 +119,8 @@ async def get_upload(
     status_code=200,
     responses={
         200: {"description": "Thumbnail image content"},
-        404: {"description": "Upload not found", "model": ErrorResponse},
+        422: {"description": "Image cannot be decoded", "model": ErrorResponse},
+        **NOT_FOUND_RESPONSES,
     },
 )
 async def get_upload_thumbnail(
@@ -127,9 +128,12 @@ async def get_upload_thumbnail(
     upload_service: UploadService = Depends(get_upload_service),
     thumbnail_service: ThumbnailService = Depends(get_thumbnail_service),
 ):
-    upload = upload_service.get_lazy_upload(upload_id)
-    thumbnail = thumbnail_service.get_thumbnail(upload_id, upload.load_content)
-    return ImageResponse(content=thumbnail, media_type=THUMBNAIL_CONTENT_TYPE)
+    upload = upload_service.get_upload(upload_id)
+    try:
+        thumbnail = thumbnail_service.get_thumbnail(upload_id, upload.content)
+    except InvalidImageException as exc:
+        raise HTTPException(status_code=422, detail=exc.detail)
+    return ImageResponse(content=thumbnail.content, media_type=thumbnail.content_type)
 
 
 @upload_router.delete(

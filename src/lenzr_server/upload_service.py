@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Callable
+from dataclasses import dataclass
 
 import sqlalchemy.exc
 from sqlmodel import Session, desc, select
@@ -11,16 +11,10 @@ from lenzr_server.types import UploadID
 from lenzr_server.upload_id_creators.id_creator import IDCreator
 
 
-class LazyUpload:
-    def __init__(self, content_type: str, load_fn: Callable[[], bytes]):
-        self.content_type = content_type
-        self._load_fn = load_fn
-        self._content: bytes | None = None
-
-    def load_content(self) -> bytes:
-        if self._content is None:
-            self._content = self._load_fn()
-        return self._content
+@dataclass(frozen=True)
+class Upload:
+    content: bytes
+    content_type: str
 
 
 class UploadAlreadyExistingException(AlreadyExistingException):
@@ -71,7 +65,7 @@ class UploadService:
         upload_id = self._upload_id_creator.create_upload_id(content)
         return upload_id
 
-    def get_lazy_upload(self, upload_id: UploadID) -> LazyUpload:
+    def get_upload(self, upload_id: UploadID) -> Upload:
         query = select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
         try:
             metadata_entry = self._database_session.exec(query).one()
@@ -79,19 +73,14 @@ class UploadService:
             logging.error(f"Upload {upload_id} not found in database")
             raise UploadNotFoundException()
 
-        def load_content() -> bytes:
-            try:
-                file_id = FileID(upload_id)
-                return self._file_storage.get_file_content(file_id)
-            except FileNotFoundError:
-                logging.error(f"Upload {upload_id} not found on disk")
-                raise UploadNotFoundException()
+        try:
+            file_id = FileID(upload_id)
+            content = self._file_storage.get_file_content(file_id)
+        except FileNotFoundError:
+            logging.error(f"Upload {upload_id} not found on disk")
+            raise UploadNotFoundException()
 
-        return LazyUpload(content_type=metadata_entry.content_type, load_fn=load_content)
-
-    def get_upload(self, upload_id: UploadID) -> tuple[bytes, str]:
-        lazy = self.get_lazy_upload(upload_id)
-        return lazy.load_content(), lazy.content_type
+        return Upload(content=content, content_type=metadata_entry.content_type)
 
     def delete_upload(self, upload_id: UploadID) -> UploadMetaData:
         query = select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
