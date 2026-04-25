@@ -36,3 +36,29 @@ def test__get_file_content__nonexistent_file__raises_file_not_found_error(on_dis
 
     with pytest.raises(FileNotFoundError):
         on_disk_file_storage.get_file_content(file_id)
+
+
+@pytest.mark.parametrize(
+    "file_id",
+    [
+        pytest.param("", id="empty"),
+        pytest.param("..", id="parent_dir"),
+        pytest.param("../escape", id="parent_traversal"),
+        pytest.param("sub/file", id="forward_slash"),
+        pytest.param("/etc/passwd", id="absolute_path"),
+        pytest.param(".", id="current_dir"),
+    ],
+)
+def test__add_file__rejects_traversal_attempts(on_disk_file_storage, file_id):
+    with pytest.raises(ValueError):
+        on_disk_file_storage.add_file(FileID(file_id), b"x")
+
+
+def test__add_file__cannot_escape_base_path(on_disk_file_storage, tmp_path):
+    sibling = tmp_path.parent / "sibling"
+    sibling.mkdir(exist_ok=True)
+
+    with pytest.raises(ValueError):
+        on_disk_file_storage.add_file(FileID(".."), b"x")
+
+    assert not (sibling / "x").exists()
