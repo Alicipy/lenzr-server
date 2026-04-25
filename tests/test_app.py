@@ -62,6 +62,13 @@ def _create_real_image(width: int = 800, height: int = 600) -> bytes:
     return output.getvalue()
 
 
+def test__api_health__returns_200_ok_without_auth(client):
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test__api_post_upload__upload_image_file__returns_201_with_id(client):
     response = client.post(
         "/uploads",

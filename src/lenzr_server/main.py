@@ -28,6 +28,12 @@ app.include_router(upload_router)
 app.include_router(tag_router)
 
 
+@app.get("/health", tags=["Health"], summary="Liveness probe")
+async def health() -> dict[str, str]:
+    """Unauthenticated probe for orchestrators (Docker, Kubernetes, etc.)."""
+    return {"status": "ok"}
+
+
 @app.webhooks.post("upload.created")
 def upload_created(body: WebhookPayload):
     """Sent as an HTTP POST to the configured `WEBHOOK_URL` when a new upload is created.
