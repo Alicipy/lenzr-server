@@ -58,8 +58,22 @@ class UploadService:
             logging.error(f"Upload {upload_id} already stored")
             self._file_storage.delete_file_content(file_id)
             raise UploadAlreadyExistingException(upload_id=upload_id)
+        except Exception:
+            self._database_session.rollback()
+            logging.exception("Failed to persist metadata for upload %s", upload_id)
+            self._delete_orphan_file(file_id)
+            raise
 
         return upload_metadata
+
+    def _delete_orphan_file(self, file_id: FileID) -> None:
+        try:
+            self._file_storage.delete_file_content(file_id)
+        except Exception:
+            # The metadata insert already failed; surface the original error
+            # rather than the cleanup failure, but log so an operator can
+            # collect the leaked blob.
+            logging.exception("Failed to clean up orphaned file %s", file_id)
 
     def get_id_for_content(self, content: bytes) -> UploadID:
         upload_id = self._upload_id_creator.create_upload_id(content)

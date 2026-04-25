@@ -77,6 +77,33 @@ def test__add_upload__file_write_fails__no_dangling_db_record(
     assert result is None
 
 
+def test__add_upload__db_flush_fails__cleans_up_orphan_file(
+    database_session, file_storage, id_creator, mocker
+):
+    service = UploadService(file_storage, database_session, id_creator)
+    content = b"test_content"
+    mocker.patch.object(database_session, "flush", side_effect=RuntimeError("boom"))
+
+    with pytest.raises(RuntimeError):
+        service.add_upload(content, "text/plain")
+
+    upload_id = id_creator.create_upload_id(content)
+    file_path = os.path.join(file_storage._base_path, upload_id)
+    assert not os.path.exists(file_path)
+
+
+def test__add_upload__db_flush_fails__cleanup_failure_does_not_mask_original(
+    database_session, id_creator, mocker, tmp_path
+):
+    file_storage = OnDiskFileStorage(tmp_path)
+    file_storage.delete_file_content = MagicMock(side_effect=OSError("cleanup failed"))
+    service = UploadService(file_storage, database_session, id_creator)
+    mocker.patch.object(database_session, "flush", side_effect=RuntimeError("boom"))
+
+    with pytest.raises(RuntimeError):
+        service.add_upload(b"test_content", "text/plain")
+
+
 def test__add_upload__duplicate_entry__cleans_up_orphan_file(
     upload_service, file_storage, id_creator
 ):
