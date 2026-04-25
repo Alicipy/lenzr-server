@@ -15,10 +15,16 @@ from lenzr_server.upload_id_creators.id_creator import IDCreator
 from lenzr_server.upload_service import UploadService
 from lenzr_server.webhook import WebhookNotifier
 
+DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
 
 def get_id_creator():
     creator = HashingIDCreator(seed=32)
     return creator
+
+
+def get_max_upload_bytes() -> int:
+    return int(os.environ.get("MAX_UPLOAD_BYTES", DEFAULT_MAX_UPLOAD_BYTES))
 
 
 def get_file_storage():
