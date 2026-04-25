@@ -70,27 +70,6 @@ async def upload_file(
 
 
 @upload_router.get(
-    "/search",
-    summary="Search uploads by tags",
-    description="Find uploads that have all specified tags (AND logic)",
-    response_model=list[UploadWithTagsResponse],
-    status_code=200,
-    responses={
-        200: {"description": "List of matching uploads with their tags"},
-    },
-)
-async def search_uploads_by_tags(
-    tags: list[TagName] = Query(..., description="Tags to search for (AND logic)"),
-    offset: int = Query(0, description="Number of items to skip"),
-    limit: int = Query(10, description="Maximum number of items to return"),
-    tag_service: TagService = Depends(get_tag_service),
-    _login_valid: None = Depends(check_login_valid),
-):
-    results = tag_service.search_by_tags(tags, offset=offset, limit=limit)
-    return [UploadWithTagsResponse.from_upload_with_tags(r) for r in results]
-
-
-@upload_router.get(
     "/{upload_id}",
     summary="Get image",
     description="Download an uploaded image by ID",
@@ -204,26 +183,26 @@ async def get_upload_tags(
 
 @upload_router.get(
     "",
-    summary="List all uploads",
-    description="Get a list of all upload IDs currently stored on the server in "
-    "descending order of upload time.",
-    response_model=list[UploadMetaDataPublicResponse],
+    summary="List uploads",
+    description="Get a list of uploads in descending order of upload time. "
+    "Optionally filter by tags (AND logic).",
+    response_model=list[UploadWithTagsResponse],
     status_code=200,
     responses={
         200: {
-            "description": "List of upload IDs",
+            "description": "List of uploads with tags and metadata",
         }
     },
 )
 async def list_uploads(
-    upload_service: UploadService = Depends(get_upload_service),
-    _login_valid: None = Depends(check_login_valid),
+    tags: list[TagName] = Query(default=[], description="Filter by tags (AND logic)"),
     offset: int = Query(0, description="Number of items to skip"),
     limit: int = Query(10, description="Maximum number of items to return"),
+    tag_service: TagService = Depends(get_tag_service),
+    _login_valid: None = Depends(check_login_valid),
 ):
-    uploads = upload_service.list_uploads(offset=offset, limit=limit)
-
-    return uploads
+    results = tag_service.list_with_tags(tag_names=tags, offset=offset, limit=limit)
+    return [UploadWithTagsResponse.from_upload_with_tags(r) for r in results]
 
 
 tag_router = APIRouter(prefix="/tags", tags=["Tags"])

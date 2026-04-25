@@ -190,8 +190,13 @@ def test__api_get_uploads__get_uploads_after_post_multiple_files__returns_200_wi
 
     assert response.status_code == 200
     content = response.json()
-    assert {"upload_id": "1"} in content
-    assert {"upload_id": "2"} in content
+    upload_ids = [item["upload_id"] for item in content]
+    assert "1" in upload_ids
+    assert "2" in upload_ids
+    for item in content:
+        assert "tags" in item
+        assert "created_at" in item
+        assert "content_type" in item
 
 
 def test__api_get_uploads__get_uploads_without_auth__returns_401_unauthorized(client):
@@ -386,7 +391,7 @@ def test__api_put_upload_tags__empty_list__clears_tags(client):
     assert get_response.json()["tags"] == []
 
 
-def test__api_get_uploads_search__and_logic__returns_matching_uploads(client):
+def test__api_get_uploads__filter_by_tags__and_logic__returns_matching_uploads(client):
     upload_id1 = _create_upload(client, b"file1", "f1.png")
     upload_id2 = _create_upload(client, b"file2", "f2.png")
 
@@ -402,7 +407,7 @@ def test__api_get_uploads_search__and_logic__returns_matching_uploads(client):
     )
 
     response = client.get(
-        "/uploads/search",
+        "/uploads",
         params={"tags": ["landscape", "nature"]},
         headers=get_auth_headers(),
     )
@@ -413,7 +418,7 @@ def test__api_get_uploads_search__and_logic__returns_matching_uploads(client):
     assert data[0]["upload_id"] == upload_id1
 
 
-def test__api_get_uploads_search__and_logic__response_includes_all_tags(client):
+def test__api_get_uploads__filter_by_tags__and_logic__response_includes_all_tags(client):
     upload_id1 = _create_upload(client, b"file1", "f1.png")
     _create_upload(client, b"file2", "f2.png")
 
@@ -424,7 +429,7 @@ def test__api_get_uploads_search__and_logic__response_includes_all_tags(client):
     )
 
     response = client.get(
-        "/uploads/search",
+        "/uploads",
         params={"tags": ["landscape", "nature"]},
         headers=get_auth_headers(),
     )
@@ -438,7 +443,7 @@ def test__api_get_uploads_search__and_logic__response_includes_all_tags(client):
     assert data[0]["content_type"] == "image/png"
 
 
-def test__api_get_uploads_search__single_tag__returns_all_matching(client):
+def test__api_get_uploads__filter_by_tags__single_tag__returns_all_matching(client):
     upload_id1 = _create_upload(client, b"file1", "f1.png")
     upload_id2 = _create_upload(client, b"file2", "f2.png")
 
@@ -454,7 +459,7 @@ def test__api_get_uploads_search__single_tag__returns_all_matching(client):
     )
 
     response = client.get(
-        "/uploads/search",
+        "/uploads",
         params={"tags": ["landscape"]},
         headers=get_auth_headers(),
     )
@@ -464,9 +469,9 @@ def test__api_get_uploads_search__single_tag__returns_all_matching(client):
     assert len(data) == 2
 
 
-def test__api_get_uploads_search__invalid_tag_name__returns_422(client):
+def test__api_get_uploads__filter_by_tags__invalid_tag_name__returns_422(client):
     response = client.get(
-        "/uploads/search",
+        "/uploads",
         params={"tags": ["INVALID"]},
         headers=get_auth_headers(),
     )
@@ -474,11 +479,11 @@ def test__api_get_uploads_search__invalid_tag_name__returns_422(client):
     assert response.status_code == 422
 
 
-def test__api_get_uploads_search__no_matches__returns_empty(client):
+def test__api_get_uploads__filter_by_tags__no_matches__returns_empty(client):
     _create_upload(client)
 
     response = client.get(
-        "/uploads/search",
+        "/uploads",
         params={"tags": ["nonexistent"]},
         headers=get_auth_headers(),
     )
@@ -487,9 +492,9 @@ def test__api_get_uploads_search__no_matches__returns_empty(client):
     assert response.json() == []
 
 
-def test__api_get_uploads_search__without_auth__returns_401(client):
+def test__api_get_uploads__filter_by_tags__without_auth__returns_401(client):
     response = client.get(
-        "/uploads/search",
+        "/uploads",
         params={"tags": ["landscape"]},
     )
 
