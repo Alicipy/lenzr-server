@@ -13,6 +13,7 @@ from lenzr_server.thumbnail_service import InMemoryThumbnailService, ThumbnailSe
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
 from lenzr_server.upload_id_creators.id_creator import IDCreator
 from lenzr_server.upload_service import UploadService
+from lenzr_server.webhook import WebhookNotifier
 
 
 def get_id_creator():
@@ -56,6 +57,10 @@ def get_tag_service(
 
 def get_thumbnail_service(request: Request) -> ThumbnailService:
     return InMemoryThumbnailService(cache=request.app.state.thumbnail_cache)
+
+
+def get_webhook_notifier(request: Request) -> WebhookNotifier:
+    return request.app.state.webhook_notifier
 
 
 http_basic_auth = HTTPBasic()
