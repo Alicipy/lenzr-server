@@ -497,6 +497,34 @@ def test__api_get_uploads__filter_by_tags__no_matches__returns_empty(client):
     assert response.json() == []
 
 
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({"offset": -1}, id="negative_offset"),
+        pytest.param({"limit": 0}, id="zero_limit"),
+        pytest.param({"limit": 101}, id="limit_over_max"),
+    ],
+)
+def test__api_get_uploads__pagination_out_of_bounds__returns_422(client, params):
+    response = client.get("/uploads", params=params, headers=get_auth_headers())
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({"offset": -1}, id="negative_offset"),
+        pytest.param({"limit": 0}, id="zero_limit"),
+        pytest.param({"limit": 51}, id="limit_over_max"),
+    ],
+)
+def test__api_get_tags__pagination_out_of_bounds__returns_422(client, params):
+    response = client.get("/tags", params=params, headers=get_auth_headers())
+
+    assert response.status_code == 422
+
+
 def test__api_get_uploads__filter_by_tags__without_auth__returns_401(client):
     response = client.get(
         "/uploads",
