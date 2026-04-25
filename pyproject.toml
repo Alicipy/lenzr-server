@@ -8,7 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.115.8",
     "httpx>=0.27",
     "pillow>=12.2.0",
-    "psycopg2-binary>=2.9.11",
+    "psycopg[binary]>=3.2.5",
     "sqlmodel>=0.0.27",
 ]
 dynamic = ["version"]
