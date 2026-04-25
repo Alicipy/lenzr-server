@@ -54,7 +54,14 @@ with the `upload_id` to a configured URL. The webhook is fire-and-forget and doe
 the upload response.
 
 Set `WEBHOOK_URL` to enable this feature. Optionally set `WEBHOOK_SECRET` to enable
-HMAC-SHA256 request signing via the `X-Lenzr-Signature` header.
+HMAC-SHA256 request signing. When set, every request carries:
+
+- `X-Lenzr-Timestamp` — dispatch time as Unix seconds
+- `X-Lenzr-Signature` — `sha256=<hex_digest>` over `<timestamp>.<raw_body>`
+
+Receivers should verify the signature with `hmac.compare_digest` and reject any
+request whose timestamp is older than a small tolerance (e.g. 5 minutes) to
+defend against replays.
 
 ### `docker-compose`
 

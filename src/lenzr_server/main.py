@@ -32,8 +32,12 @@ app.include_router(tag_router)
 def upload_created(body: WebhookPayload):
     """Sent as an HTTP POST to the configured `WEBHOOK_URL` when a new upload is created.
 
-    If `WEBHOOK_SECRET` is set, the request body is signed with HMAC-SHA256 and the
-    signature is supplied in the `X-Lenzr-Signature` header as `sha256=<hex_digest>`.
+    If `WEBHOOK_SECRET` is set, the request is signed with HMAC-SHA256. The
+    server sets `X-Lenzr-Timestamp` to the dispatch time as Unix seconds and
+    `X-Lenzr-Signature` to `sha256=<hex_digest>` over the bytes
+    `<timestamp>.<raw_body>`. Receivers should verify the signature using
+    `hmac.compare_digest` and reject any request with a timestamp older than
+    a few minutes to defend against replays.
     """
 
 
