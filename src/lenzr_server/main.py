@@ -1,8 +1,10 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import fastapi
+from fastapi import Header
 from fastapi.responses import JSONResponse
 
 import lenzr_server
@@ -41,16 +43,45 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.webhooks.post("upload.created")
-def upload_created(body: WebhookPayload):
+@app.webhooks.post(
+    "upload.created",
+    status_code=204,
+    response_class=fastapi.Response,
+    responses={
+        204: {"description": "Acknowledged."},
+        "default": {"description": "Receiver indicated an error."},
+    },
+)
+def upload_created(
+    body: WebhookPayload,
+    x_lenzr_timestamp: Annotated[
+        str | None,
+        Header(
+            description=(
+                "Dispatch time as Unix seconds. Sent only when `WEBHOOK_SECRET` is "
+                "configured. Receivers should reject requests whose timestamp is "
+                "older than a few minutes to defend against replays."
+            ),
+        ),
+    ] = None,
+    x_lenzr_signature: Annotated[
+        str | None,
+        Header(
+            description=(
+                "HMAC-SHA256 signature over the bytes `<timestamp>.<raw_body>`, "
+                "encoded as `sha256=<hex_digest>`. Sent only when `WEBHOOK_SECRET` "
+                "is configured. Verify with `hmac.compare_digest`."
+            ),
+        ),
+    ] = None,
+):
     """Sent as an HTTP POST to the configured `WEBHOOK_URL` when a new upload is created.
 
-    If `WEBHOOK_SECRET` is set, the request is signed with HMAC-SHA256. The
-    server sets `X-Lenzr-Timestamp` to the dispatch time as Unix seconds and
-    `X-Lenzr-Signature` to `sha256=<hex_digest>` over the bytes
-    `<timestamp>.<raw_body>`. Receivers should verify the signature using
-    `hmac.compare_digest` and reject any request with a timestamp older than
-    a few minutes to defend against replays.
+    If `WEBHOOK_SECRET` is set, the request is signed with HMAC-SHA256 and the
+    `X-Lenzr-Timestamp` and `X-Lenzr-Signature` headers are included.
+
+    Delivery is fire-and-forget: a non-2xx response or transport error is
+    logged and the dispatch is dropped — there is no retry.
     """
 
 
