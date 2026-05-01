@@ -118,6 +118,31 @@ def test__api_post_upload__upload_no_file__returns_422_validation_error(client):
     assert response.status_code == 422
 
 
+def test__api_post_upload__file_exceeds_size_limit__returns_413(client, monkeypatch):
+    monkeypatch.setenv("MAX_UPLOAD_BYTES", "16")
+
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"x" * 32, "image/png")},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Uploaded file exceeds size limit"
+
+
+def test__api_post_upload__file_at_size_limit__accepted(client, monkeypatch):
+    monkeypatch.setenv("MAX_UPLOAD_BYTES", "16")
+
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"x" * 16, "image/png")},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 201
+
+
 def test__api_get_upload_upload_id___get_upload_after_post_with_id__returns_200_with_data(client):
     response = client.post(
         "/uploads",

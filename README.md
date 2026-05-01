@@ -42,6 +42,11 @@ Afterward, look into it and modify accordingly.
 
 You _at least_ want to change the username and password for server access.
 
+#### Upload size limit
+
+`MAX_UPLOAD_BYTES` caps the size of a single uploaded file. The server rejects
+larger requests with HTTP 413. Defaults to 25 MiB (26214400 bytes) when unset.
+
 #### Webhook notifications
 
 Lenzr can notify an external service when a new image is uploaded by sending a POST request

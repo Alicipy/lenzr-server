@@ -5,6 +5,7 @@ from fastapi.responses import Response
 
 from lenzr_server.dependencies import (
     check_login_valid,
+    get_max_upload_bytes,
     get_tag_service,
     get_thumbnail_service,
     get_upload_service,
@@ -42,6 +43,7 @@ upload_router = APIRouter(prefix="/uploads", tags=["Uploads"])
             "description": "File uploaded successfully",
         },
         400: {"description": "Bad request - invalid file", "model": ErrorResponse},
+        413: {"description": "Uploaded file exceeds size limit", "model": ErrorResponse},
     },
 )
 async def upload_file(
@@ -52,9 +54,18 @@ async def upload_file(
     upload_service: UploadService = Depends(get_upload_service),
     tag_service: TagService = Depends(get_tag_service),
     webhook_notifier: WebhookNotifier = Depends(get_webhook_notifier),
+    max_upload_bytes: int = Depends(get_max_upload_bytes),
     _login_valid: None = Depends(check_login_valid),
 ):
-    content = await upload.read()
+    if upload.size is not None and upload.size > max_upload_bytes:
+        raise HTTPException(status_code=413, detail="Uploaded file exceeds size limit")
+
+    # Read one byte past the limit so we can still reject clients that lie
+    # about (or omit) Content-Length without buffering the whole oversized body.
+    content = await upload.read(max_upload_bytes + 1)
+    if len(content) > max_upload_bytes:
+        raise HTTPException(status_code=413, detail="Uploaded file exceeds size limit")
+
     content_type = upload.content_type
     if content_type is None or not content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Bad request - invalid file")
