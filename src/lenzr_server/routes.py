@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
 from lenzr_server.dependencies import (
@@ -128,7 +129,11 @@ async def get_upload_thumbnail(
 ):
     upload = upload_service.get_upload(upload_id)
     try:
-        thumbnail = thumbnail_service.get_thumbnail(upload_id, upload.content)
+        # Pillow decode/encode is CPU-bound; offload to a worker thread so we
+        # don't block the event loop for other requests.
+        thumbnail = await run_in_threadpool(
+            thumbnail_service.get_thumbnail, upload_id, upload.content
+        )
     except InvalidImageException as exc:
         raise HTTPException(status_code=422, detail=exc.detail)
     return ImageResponse(content=thumbnail.content, media_type=thumbnail.content_type)
