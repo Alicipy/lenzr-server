@@ -1,5 +1,5 @@
 import os
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from urllib.parse import urlparse
 
@@ -10,7 +10,7 @@ from lenzr_server.webhook.notifier import NoOpWebhookNotifier, WebhookNotifier
 
 
 @contextmanager
-def webhook_notifier_from_env() -> Iterator[WebhookNotifier]:
+def webhook_notifier_from_env() -> Generator[WebhookNotifier, None, None]:
     url = os.getenv("WEBHOOK_URL")
     if not url:
         yield NoOpWebhookNotifier()

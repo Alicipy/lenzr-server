@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import sqlalchemy as sa
 import sqlalchemy.exc
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from lenzr_server.exceptions import NotFoundException
 from lenzr_server.models.tags import Tag, UploadTag
@@ -29,7 +29,7 @@ class TagService:
         self._database_session = database_session
 
     def _get_upload(self, upload_id: UploadID) -> UploadMetaData:
-        query = select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
+        query = select(UploadMetaData).where(col(UploadMetaData.upload_id) == upload_id)
         try:
             return self._database_session.exec(query).one()
         except sqlalchemy.exc.NoResultFound:
@@ -38,15 +38,15 @@ class TagService:
     def _get_tags_by_upload_pk(self, upload_pk) -> list[TagName]:
         query = (
             select(Tag.name)
-            .join(UploadTag, UploadTag.tag_pk == Tag.pk)
-            .where(UploadTag.upload_pk == upload_pk)
+            .join(UploadTag, col(UploadTag.tag_pk) == Tag.pk)
+            .where(col(UploadTag.upload_pk) == upload_pk)
         )
         return list(self._database_session.exec(query).all())
 
     def _get_or_create_tags(self, names: list[str]) -> dict[str, Tag]:
         if not names:
             return {}
-        existing = self._database_session.exec(select(Tag).where(Tag.name.in_(names))).all()
+        existing = self._database_session.exec(select(Tag).where(col(Tag.name).in_(names))).all()
         tag_map = {tag.name: tag for tag in existing}
         for name in names:
             if name not in tag_map:
@@ -60,7 +60,9 @@ class TagService:
         upload = self._get_upload(upload_id)
         upload_pk = upload.pk
 
-        self._database_session.exec(sa.delete(UploadTag).where(UploadTag.upload_pk == upload_pk))
+        self._database_session.exec(
+            sa.delete(UploadTag).where(col(UploadTag.upload_pk) == upload_pk)
+        )
 
         unique_names = list(dict.fromkeys(tag_names))
         tag_map = self._get_or_create_tags(unique_names)
@@ -91,8 +93,8 @@ class TagService:
         upload_pks = [u.pk for u in uploads]
         tag_rows = self._database_session.exec(
             select(UploadTag.upload_pk, Tag.name)
-            .join(Tag, Tag.pk == UploadTag.tag_pk)
-            .where(UploadTag.upload_pk.in_(upload_pks))
+            .join(Tag, col(Tag.pk) == UploadTag.tag_pk)
+            .where(col(UploadTag.upload_pk).in_(upload_pks))
         ).all()
         tags_by_pk: dict = {}
         for upload_pk, tag_name in tag_rows:
@@ -120,15 +122,15 @@ class TagService:
             unique_names = list(dict.fromkeys(tag_names))
             # AND logic: only uploads that have ALL requested tags
             query = (
-                query.join(UploadTag, UploadTag.upload_pk == UploadMetaData.pk)
-                .join(Tag, Tag.pk == UploadTag.tag_pk)
-                .where(Tag.name.in_(unique_names))
-                .group_by(UploadMetaData.pk)
-                .having(sa.func.count(sa.distinct(Tag.name)) == len(unique_names))
+                query.join(UploadTag, col(UploadTag.upload_pk) == UploadMetaData.pk)
+                .join(Tag, col(Tag.pk) == UploadTag.tag_pk)
+                .where(col(Tag.name).in_(unique_names))
+                .group_by(col(UploadMetaData.pk))
+                .having(sa.func.count(sa.distinct(col(Tag.name))) == len(unique_names))
             )
 
-        query = query.order_by(UploadMetaData.created_at.desc()).offset(offset).limit(limit)
-        uploads = self._database_session.exec(query).all()
+        query = query.order_by(col(UploadMetaData.created_at).desc()).offset(offset).limit(limit)
+        uploads = list(self._database_session.exec(query).all())
         return self._to_uploads_with_tags(uploads)
 
     def list_all_tags(self, offset: int = 0, limit: int = 100) -> list[TagName]:
