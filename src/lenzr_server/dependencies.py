@@ -17,10 +17,11 @@ from lenzr_server.webhook import WebhookNotifier
 
 DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
+_id_creator = HashingIDCreator(seed=32)
 
-def get_id_creator():
-    creator = HashingIDCreator(seed=32)
-    return creator
+
+def get_id_creator() -> IDCreator:
+    return _id_creator
 
 
 def get_max_upload_bytes() -> int:
