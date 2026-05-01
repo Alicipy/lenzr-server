@@ -204,8 +204,8 @@ async def get_upload_tags(
 )
 async def list_uploads(
     tags: list[TagName] = Query(default=[], description="Filter by tags (AND logic)"),
-    offset: int = Query(0, description="Number of items to skip"),
-    limit: int = Query(10, description="Maximum number of items to return"),
+    offset: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of items to return"),
     tag_service: TagService = Depends(get_tag_service),
     _login_valid: None = Depends(check_login_valid),
 ):
@@ -227,8 +227,8 @@ tag_router = APIRouter(prefix="/tags", tags=["Tags"])
     },
 )
 async def list_all_tags(
-    offset: int = Query(0, description="Number of items to skip"),
-    limit: int = Query(100, description="Maximum number of items to return"),
+    offset: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(50, ge=1, le=50, description="Maximum number of items to return"),
     tag_service: TagService = Depends(get_tag_service),
     _login_valid: None = Depends(check_login_valid),
 ):
