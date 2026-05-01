@@ -37,7 +37,9 @@ services:
   alembic_migrate:
     image: ghcr.io/alicipy/lenzr-server:latest
     container_name: alembic_migrate
-    command: uv run alembic upgrade head
+    # Invoke alembic directly: 'uv run' triggers a project re-resolve that
+    # requires .git (uv-dynamic-versioning), which isn't shipped in the image.
+    command: alembic upgrade head
     environment:
       - DATABASE_URL=${DATABASE_URL}
     networks:
