@@ -1,3 +1,5 @@
+import logging
+import os
 from contextlib import asynccontextmanager
 
 import fastapi
@@ -8,6 +10,11 @@ from lenzr_server.exceptions import NotFoundException
 from lenzr_server.routes import tag_router, upload_router
 from lenzr_server.thumbnail_service import InMemoryThumbnailCache
 from lenzr_server.webhook import WebhookPayload, webhook_notifier_from_env
+
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 
 @asynccontextmanager
