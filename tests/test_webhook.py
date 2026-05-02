@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import logging
 import re
@@ -14,6 +16,7 @@ OTHER_SECRET = "other-secret"
 SIGNATURE_PATTERN = re.compile(r"^sha256=[0-9a-f]{64}$")
 FIXED_TIMESTAMP = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 FIXED_DELIVERY_ID = "fixed-delivery-id"
+FIXED_DISPATCH_EPOCH = 1704110400
 
 
 @pytest.fixture
@@ -28,6 +31,7 @@ def _make_notifier(http_client: httpx.Client, secret: str | None = None) -> Http
         client=http_client,
         secret=secret,
         delivery_id_factory=lambda: FIXED_DELIVERY_ID,
+        clock_factory=lambda: FIXED_DISPATCH_EPOCH,
     )
 
 
@@ -99,6 +103,54 @@ def test__send__different_secrets_same_body__produce_different_signatures(http_c
 
     _make_notifier(http_client, secret=SECRET).send("abc", FIXED_TIMESTAMP)
     _make_notifier(http_client, secret=OTHER_SECRET).send("abc", FIXED_TIMESTAMP)
+
+    first = route.calls[0].request.headers["X-Lenzr-Signature"]
+    second = route.calls[1].request.headers["X-Lenzr-Signature"]
+    assert first != second
+
+
+def test__send__with_secret__sets_dispatch_timestamp_header(notifier_with_secret, webhook_route):
+    notifier_with_secret.send("abc123", FIXED_TIMESTAMP)
+
+    assert "X-Lenzr-Timestamp" in webhook_route.calls.last.request.headers
+
+
+def test__send__without_secret__no_timestamp_header(notifier, webhook_route):
+    notifier.send("abc123", FIXED_TIMESTAMP)
+
+    assert "X-Lenzr-Timestamp" not in webhook_route.calls.last.request.headers
+
+
+def test__send__signature_covers_timestamp_and_body(http_client, respx_mock):
+    route = respx_mock.post(WEBHOOK_URL).mock(return_value=httpx.Response(200))
+    _make_notifier(http_client, secret=SECRET).send("abc123", FIXED_TIMESTAMP)
+
+    request = route.calls.last.request
+    timestamp = request.headers["X-Lenzr-Timestamp"]
+    expected_input = timestamp.encode() + b"." + request.content
+    expected = hmac.new(SECRET.encode(), expected_input, hashlib.sha256).hexdigest()
+    assert request.headers["X-Lenzr-Signature"] == f"sha256={expected}"
+
+
+def test__send__different_dispatch_times_same_body__produce_different_signatures(
+    http_client, respx_mock
+):
+    route = respx_mock.post(WEBHOOK_URL).mock(return_value=httpx.Response(200))
+
+    HttpWebhookNotifier(
+        WEBHOOK_URL,
+        client=http_client,
+        secret=SECRET,
+        delivery_id_factory=lambda: FIXED_DELIVERY_ID,
+        clock_factory=lambda: 1000,
+    ).send("abc", FIXED_TIMESTAMP)
+    HttpWebhookNotifier(
+        WEBHOOK_URL,
+        client=http_client,
+        secret=SECRET,
+        delivery_id_factory=lambda: FIXED_DELIVERY_ID,
+        clock_factory=lambda: 2000,
+    ).send("abc", FIXED_TIMESTAMP)
 
     first = route.calls[0].request.headers["X-Lenzr-Signature"]
     second = route.calls[1].request.headers["X-Lenzr-Signature"]
