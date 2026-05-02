@@ -17,7 +17,8 @@ services:
       - LENZR_USERNAME=${LENZR_USERNAME}
       - LENZR_PASSWORD=${LENZR_PASSWORD}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:18.0-alpine3.22
@@ -33,6 +34,12 @@ services:
       - internal
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
   alembic_migrate:
     image: ghcr.io/alicipy/lenzr-server:latest
@@ -47,7 +54,8 @@ services:
     security_opt:
       - no-new-privileges:true
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 networks:
   internal:

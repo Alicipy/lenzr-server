@@ -46,4 +46,7 @@ RUN --mount=type=cache,target=/appuser/.cache/uv \
     --mount=type=bind,source=.git,target=/app/.git \
     uv sync --frozen --no-dev
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=4).status == 200 else 1)"
+
 CMD ["uvicorn", "lenzr_server.main:app", "--host", "0.0.0.0", "--port", "8000"]
