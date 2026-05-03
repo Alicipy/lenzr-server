@@ -97,20 +97,21 @@ class UploadService:
         return Upload(content=content, content_type=metadata_entry.content_type)
 
     def delete_upload(self, upload_id: UploadID) -> UploadMetaData:
+        # DB is source of truth, orphaned file is acceptable
         query = select(UploadMetaData).where(UploadMetaData.upload_id == upload_id)
         try:
             upload = self._database_session.exec(query).one()
-            self._database_session.delete(upload)
-            self._database_session.flush()
         except sqlalchemy.exc.NoResultFound:
-            logging.error(f"Upload {upload_id} not found in database")
             raise UploadNotFoundException()
 
+        self._database_session.delete(upload)
+
         try:
-            file_id = FileID(upload_id)
-            self._file_storage.delete_file_content(file_id)
-        except FileNotFoundError:
-            logging.error(f"Upload {upload_id} not found on disk")
-            raise UploadNotFoundException()
+            self._file_storage.delete_file_content(FileID(upload_id))
+        except Exception:
+            logging.exception(
+                "Failed to delete file for upload %s; DB row removed, file may be orphaned",
+                upload_id,
+            )
 
         return upload
