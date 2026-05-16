@@ -34,7 +34,7 @@ USER appuser
 RUN git config --global --add safe.directory /app
 
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
-RUN --mount=type=cache,target=/appuser/.cache/uv \
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=${APP_USER_UID},gid=${APP_USER_GID} \
     --mount=type=bind,source=.git,target=/app/.git \
     uv sync --frozen --no-dev --no-install-project
 
@@ -42,7 +42,7 @@ COPY ./README.md ./alembic.ini ./
 COPY ./alembic ./alembic
 COPY ./src ./src
 
-RUN --mount=type=cache,target=/appuser/.cache/uv \
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=${APP_USER_UID},gid=${APP_USER_GID} \
     --mount=type=bind,source=.git,target=/app/.git \
     uv sync --frozen --no-dev
 
