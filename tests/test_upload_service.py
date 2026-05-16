@@ -161,3 +161,40 @@ def test__delete_upload__valid_id__deletes_from_database_and_disk(
 def test__delete_upload__missing_id__raises_upload_not_found_exception(upload_service):
     with pytest.raises(UploadNotFoundException):
         upload_service.delete_upload("missing_upload_id")
+
+
+def test__delete_upload__file_already_missing__removes_db_row(
+    upload_service, database_session, file_storage
+):
+    upload = upload_service.add_upload(b"content", "text/plain")
+    os.remove(os.path.join(file_storage._base_path, upload.upload_id))
+
+    upload_service.delete_upload(upload.upload_id)
+
+    assert (
+        database_session.exec(
+            select(UploadMetaData).where(UploadMetaData.upload_id == upload.upload_id)
+        ).first()
+        is None
+    )
+
+
+def test__delete_upload__file_delete_raises__removes_db_row(database_session, id_creator):
+    failing_storage = MagicMock()
+    failing_storage.delete_file_content.side_effect = PermissionError("denied")
+    service = UploadService(failing_storage, database_session, id_creator)
+    upload = UploadMetaData(
+        upload_id="DEF123",
+        content_type="text/plain",
+    )
+    database_session.add(upload)
+    database_session.flush()
+
+    service.delete_upload(upload.upload_id)
+
+    assert (
+        database_session.exec(
+            select(UploadMetaData).where(UploadMetaData.upload_id == upload.upload_id)
+        ).first()
+        is None
+    )
