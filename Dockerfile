@@ -51,8 +51,10 @@ RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=${APP_USER_UID},gid=${
     --mount=type=bind,source=.git,target=/app/.git \
     uv sync --frozen --no-dev
 
-# start-period covers the first-start model download.
+# start-period covers the first-start model download. BusyBox wget avoids a
+# CPython start per probe; 127.0.0.1 because BusyBox resolves localhost to ::1
+# while uvicorn binds IPv4 only.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD python -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=4).status == 200 else 1)"
+    CMD ["wget", "-q", "-T", "4", "-O", "/dev/null", "http://127.0.0.1:8000/health"]
 
 CMD ["uvicorn", "lenzr_server.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -3,6 +3,12 @@ services:
     image: ghcr.io/alicipy/lenzr-server:latest
     container_name: lenzr_server
     restart: unless-stopped
+    # Makes the kernel reclaim dentry slab, which otherwise grows to GBs in
+    # docker stats; 1G leaves headroom for decoding large uploads.
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     ports:
       - "8000:8000"
     networks:
@@ -51,6 +57,10 @@ services:
     # Invoke alembic directly: 'uv run' triggers a project re-resolve that
     # requires .git (uv-dynamic-versioning), which isn't shipped in the image.
     command: alembic upgrade head
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     environment:
       - DATABASE_URL=${DATABASE_URL}
     networks:

@@ -79,7 +79,8 @@ enables it; the ~31 MB model downloads once into the `model_cache` volume.
 
 For cross-lingual matching (`hund` finds `dog`), use
 `minishlab/potion-multilingual-128M`: 2.1 GB cache, ~1.6 GiB RSS and weaker
-English; its threshold is also ~0.23.
+English; its threshold is also ~0.23. Raise the server's 1G compose memory
+limit to fit it.
 
 Search responses carry `semantic_status`: `active`, or `disabled` when the
 provider is `none` or the model failed to load. Lexical search works either way.
