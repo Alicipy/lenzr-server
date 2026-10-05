@@ -7,6 +7,10 @@ dependencies = [
     "alembic>=1.17.1",
     "fastapi[standard]>=0.115.8",
     "httpx>=0.27",
+    # imported by StaticModel.from_pretrained, undeclared by model2vec
+    "huggingface-hub>=0.24",
+    "model2vec>=0.8,<0.9",
+    "numpy>=2.4.6",
     "pillow>=12.2.0",
     "psycopg[binary]>=3.2.5",
     "rapidfuzz>=3.14.5",

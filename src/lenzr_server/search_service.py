@@ -7,6 +7,7 @@ from typing import NamedTuple, get_args
 from rapidfuzz.distance import Levenshtein
 from sqlmodel import Session, col, select
 
+from lenzr_server.embedding import TagEmbeddingIndex
 from lenzr_server.exceptions import InvalidSearchQueryException
 from lenzr_server.models.tags import Tag, UploadTag
 from lenzr_server.models.uploads import UploadMetaData
@@ -16,6 +17,7 @@ from lenzr_server.types import MatchType, SemanticStatus, TagName
 MAX_QUERY_LENGTH = 256
 MAX_TERMS = 5
 MIN_TERM_LENGTH_FOR_DEEP_TIERS = 3
+SEMANTIC_CANDIDATES_PER_TERM = 10
 
 _TIER: dict[MatchType, int] = {
     match_type: tier for tier, match_type in enumerate(get_args(MatchType))
@@ -106,15 +108,25 @@ def _rank(item: QualifyingUpload) -> tuple[int, int, float, float]:
 
 
 class SearchService:
-    def __init__(self, database_session: Session):
+    def __init__(
+        self,
+        database_session: Session,
+        tag_embedding_index: TagEmbeddingIndex | None = None,
+    ):
         self._database_session = database_session
         self._tag_service = TagService(database_session)
+        self._tag_embedding_index = tag_embedding_index
 
     def search(self, q: str, offset: int = 0, limit: int = 10) -> SearchResults:
         terms = normalize_query(q)
         vocabulary = list(self._database_session.exec(select(Tag.name)).all())
         candidates_by_term = {term: _match_term(term, vocabulary) for term in terms}
         semantic_status: SemanticStatus = "disabled"
+        if self._tag_embedding_index is not None:
+            self._add_semantic_candidates(
+                self._tag_embedding_index, terms, vocabulary, candidates_by_term
+            )
+            semantic_status = "active"
 
         if any(not candidates for candidates in candidates_by_term.values()):
             # AND semantics: a term without any candidate tag can never match.
@@ -131,6 +143,21 @@ class SearchService:
             total_count=len(ranked),
             semantic_status=semantic_status,
         )
+
+    @staticmethod
+    def _add_semantic_candidates(
+        index: TagEmbeddingIndex,
+        terms: list[str],
+        vocabulary: list[TagName],
+        candidates_by_term: dict[str, Candidates],
+    ) -> None:
+        """Add each term's similar tags in place; short terms get none."""
+        eligible = [term for term in terms if len(term) >= MIN_TERM_LENGTH_FOR_DEEP_TIERS]
+        similar = index.similar_tags(eligible, vocabulary, top_k=SEMANTIC_CANDIDATES_PER_TERM)
+        for term, tags in similar.items():
+            for tag_name, score in tags:
+                # A lexical match on the same tag wins.
+                candidates_by_term[term].setdefault(tag_name, Candidate("semantic", score))
 
     def _qualifying_uploads(
         self,

@@ -8,6 +8,7 @@ from fastapi import Header
 from fastapi.responses import JSONResponse
 
 import lenzr_server
+from lenzr_server.embedding import tag_embedding_index_from_env
 from lenzr_server.exceptions import InvalidSearchQueryException, NotFoundException
 from lenzr_server.routes import tag_router, upload_router
 from lenzr_server.thumbnail_service import InMemoryThumbnailCache
@@ -22,6 +23,7 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     app.state.thumbnail_cache = InMemoryThumbnailCache()
+    app.state.tag_embedding_index = tag_embedding_index_from_env()
     with webhook_notifier_from_env() as notifier:
         app.state.webhook_notifier = notifier
         yield

@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 import lenzr_server.security as security
 from lenzr_server.db import engine
+from lenzr_server.embedding import TagEmbeddingIndex
 from lenzr_server.file_storages.file_storage import FileStorage
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
 from lenzr_server.search_service import SearchService
@@ -63,10 +64,15 @@ def get_tag_service(
     return TagService(database_session=db_session)
 
 
+def get_tag_embedding_index(request: Request) -> TagEmbeddingIndex | None:
+    return request.app.state.tag_embedding_index
+
+
 def get_search_service(
     db_session: Session = Depends(get_db_session),
+    tag_embedding_index: TagEmbeddingIndex | None = Depends(get_tag_embedding_index),
 ) -> SearchService:
-    return SearchService(database_session=db_session)
+    return SearchService(database_session=db_session, tag_embedding_index=tag_embedding_index)
 
 
 def get_thumbnail_service(request: Request) -> ThumbnailService:

@@ -9,6 +9,7 @@ services:
       - internal
     volumes:
       - lenzr_data:/var/lib/lenzr
+      - model_cache:/opt/model-cache
     security_opt:
       - no-new-privileges:true
     environment:
@@ -16,6 +17,9 @@ services:
       - UPLOAD_STORAGE_PATH=${UPLOAD_STORAGE_PATH}
       - LENZR_USERNAME=${LENZR_USERNAME}
       - LENZR_PASSWORD=${LENZR_PASSWORD}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-local}
+      - EMBEDDING_LOCAL_MODEL=${EMBEDDING_LOCAL_MODEL:-}
+      - SEMANTIC_SIMILARITY_THRESHOLD=${SEMANTIC_SIMILARITY_THRESHOLD:-}
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +66,7 @@ networks:
 
 volumes:
   postgres_data:
+  model_cache:
   lenzr_data:
     driver: local
     driver_opts:

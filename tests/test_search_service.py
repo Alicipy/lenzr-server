@@ -181,7 +181,7 @@ def test__search__no_tags_at_all__returns_empty(search_service):
     assert results.total_count == 0
 
 
-def test__search__semantic_status_is_disabled(add_upload, search_service):
+def test__search__no_embedding_index__semantic_status_disabled(add_upload, search_service):
     add_upload("u1", ["ocean"])
 
     results = search_service.search("ocean")

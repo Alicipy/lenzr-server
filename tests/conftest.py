@@ -63,7 +63,17 @@ def set_env_variables(mocker):
         os.environ,
         {"LENZR_USERNAME": "test_user", "LENZR_PASSWORD": "test_pass"},
     )
-    mocker.patch.dict(os.environ, {"WEBHOOK_URL": "", "WEBHOOK_SECRET": ""}, clear=False)
+    mocker.patch.dict(
+        os.environ,
+        {
+            "WEBHOOK_URL": "",
+            "WEBHOOK_SECRET": "",
+            "EMBEDDING_PROVIDER": "",
+            "EMBEDDING_LOCAL_MODEL": "",
+            "SEMANTIC_SIMILARITY_THRESHOLD": "",
+        },
+        clear=False,
+    )
 
 
 @pytest.fixture
