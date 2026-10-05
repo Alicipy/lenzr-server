@@ -86,7 +86,7 @@ class TagService:
         upload = self._get_upload(upload_id)
         return self._get_tags_by_upload_pk(upload.pk)
 
-    def _to_uploads_with_tags(self, uploads: list[UploadMetaData]) -> list[UploadWithTags]:
+    def to_uploads_with_tags(self, uploads: list[UploadMetaData]) -> list[UploadWithTags]:
         if not uploads:
             return []
 
@@ -131,7 +131,7 @@ class TagService:
 
         query = query.order_by(col(UploadMetaData.created_at).desc()).offset(offset).limit(limit)
         uploads = list(self._database_session.exec(query).all())
-        return self._to_uploads_with_tags(uploads)
+        return self.to_uploads_with_tags(uploads)
 
     def list_all_tags(self, offset: int = 0, limit: int = 100) -> list[TagName]:
         query = select(Tag.name).order_by(Tag.name).offset(offset).limit(limit)

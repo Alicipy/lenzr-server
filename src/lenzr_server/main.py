@@ -8,7 +8,8 @@ from fastapi import Header
 from fastapi.responses import JSONResponse
 
 import lenzr_server
-from lenzr_server.exceptions import NotFoundException
+from lenzr_server.embedding import tag_embedding_index_from_env
+from lenzr_server.exceptions import InvalidSearchQueryException, NotFoundException
 from lenzr_server.routes import tag_router, upload_router
 from lenzr_server.thumbnail_service import InMemoryThumbnailCache
 from lenzr_server.webhook import WebhookPayload, webhook_notifier_from_env
@@ -22,6 +23,7 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     app.state.thumbnail_cache = InMemoryThumbnailCache()
+    app.state.tag_embedding_index = tag_embedding_index_from_env()
     with webhook_notifier_from_env() as notifier:
         app.state.webhook_notifier = notifier
         yield
@@ -88,3 +90,8 @@ def upload_created(
 @app.exception_handler(NotFoundException)
 async def not_found_handler(request: fastapi.Request, exc: NotFoundException):
     return JSONResponse(status_code=404, content={"detail": exc.detail})
+
+
+@app.exception_handler(InvalidSearchQueryException)
+async def invalid_search_query_handler(request: fastapi.Request, exc: InvalidSearchQueryException):
+    return JSONResponse(status_code=422, content={"detail": exc.detail})

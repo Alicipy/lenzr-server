@@ -7,6 +7,8 @@ A REST server to host, tag, and search images.
 - Upload, serve, list, and delete images via REST API
 - Content-based deduplication of uploads
 - Tag images with lowercase keywords, search by tags (AND logic)
+- Free-form tag search (`GET /uploads/search?q=`) ranked exact > prefix >
+  substring > fuzzy > semantic (`ocean` finds `sea`)
 - List all tags in use across uploads
 - Auto-generated JPEG thumbnails
 - Pagination on list and search endpoints
@@ -62,6 +64,27 @@ HMAC-SHA256 request signing. When set, every request carries:
 Receivers should verify the signature with `hmac.compare_digest` and reject any
 request whose timestamp is older than a small tolerance (e.g. 5 minutes) to
 defend against replays.
+
+#### Semantic tag search
+
+The semantic search tier embeds tags with an in-process
+[Model2Vec](https://github.com/MinishLab/model2vec) model. `docker compose`
+enables it; the ~31 MB model downloads once into the `model_cache` volume.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `EMBEDDING_PROVIDER` | `none` (code), `local` (compose) | `local` enables the semantic tier |
+| `EMBEDDING_LOCAL_MODEL` | `minishlab/potion-base-8M` | Model id or path |
+| `SEMANTIC_SIMILARITY_THRESHOLD` | `0.23` | Cosine floor; model-relative |
+
+For cross-lingual matching (`hund` finds `dog`), use
+`minishlab/potion-multilingual-128M`: 2.1 GB cache, ~1.6 GiB RSS and weaker
+English; its threshold is also ~0.23. Raise the server's 1G compose memory
+limit to fit it.
+
+Search responses carry `semantic_status`: `active`, or `disabled` when the
+provider is `none` or the model failed to load. Lexical search works either way.
+Tag embeddings live in memory and are recomputed when the tag set changes.
 
 ### `docker-compose`
 

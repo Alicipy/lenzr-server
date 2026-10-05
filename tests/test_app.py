@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlmodel import SQLModel
+from starlette.datastructures import UploadFile
 
 from lenzr_server.db import engine
 from lenzr_server.dependencies import get_id_creator, get_webhook_notifier
@@ -19,16 +20,13 @@ WEBHOOK_URL = "http://localhost/hook"
 creator = CountingIdCreator()
 
 
-def counting_id_creator():
-    return creator
-
-
-app.dependency_overrides[get_id_creator] = counting_id_creator
-
-
 @pytest.fixture(autouse=True)
-def reset_creator():
+def counting_ids():
+    """Predictable upload IDs, scoped to this module."""
     creator.reset()
+    app.dependency_overrides[get_id_creator] = lambda: creator
+    yield
+    app.dependency_overrides.pop(get_id_creator, None)
 
 
 @pytest.fixture(autouse=True)
@@ -96,6 +94,16 @@ def test__api_post_upload__upload_image_file_twice__returns_201_and_200_with_id(
     assert response1.json()["upload_id"] == response2.json()["upload_id"]
 
 
+def test__api_post_upload__wrong_credentials__returns_401_unauthorized(client):
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        headers=get_auth_headers(password="wrong_pass"),
+    )
+
+    assert response.status_code == 401
+
+
 def test__api_post_upload__upload_image_file_without_auth__returns_401_unauthorized(client):
     response = client.post(
         "/uploads", files={"upload": ("test.png", b"Hello, world!", "image/png")}
@@ -148,6 +156,25 @@ def test__api_post_upload__file_at_size_limit__accepted(client, monkeypatch):
     )
 
     assert response.status_code == 201
+
+
+def test__api_post_upload__oversized_body_with_unknown_size__returns_413(
+    client, monkeypatch, mocker
+):
+    monkeypatch.setenv("MAX_UPLOAD_BYTES", "16")
+    # Simulate a client omitting Content-Length, so upload.size is None.
+    mocker.patch.object(
+        UploadFile, "size", property(lambda self: None, lambda self, value: None), create=True
+    )
+
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"x" * 32, "image/png")},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Uploaded file exceeds size limit"
 
 
 def test__api_get_upload_upload_id___get_upload_after_post_with_id__returns_200_with_data(client):
@@ -732,6 +759,112 @@ def test__api_get_upload_thumbnail__corrupted_image_bytes__returns_422(client):
     upload_id = _create_upload(client, b"not an image", "broken.png")
 
     response = client.get(f"/uploads/{upload_id}/thumbnail")
+
+    assert response.status_code == 422
+
+
+def test__api_search__without_auth__returns_401(client):
+    response = client.get("/uploads/search", params={"q": "landscape"})
+
+    assert response.status_code == 401
+
+
+def test__api_search__route_precedence__not_shadowed_by_get_upload(client):
+    response = client.get("/uploads/search", params={"q": "anything"}, headers=get_auth_headers())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"results", "total_count", "semantic_status"}
+
+
+def test__api_search__lexical_results__envelope_and_match_metadata(client):
+    upload_id = _create_upload(client)
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get("/uploads/search", params={"q": "land"}, headers=get_auth_headers())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_count"] == 1
+    assert body["semantic_status"] == "disabled"
+    result = body["results"][0]
+    assert result["upload_id"] == upload_id
+    assert sorted(result["tags"]) == ["landscape", "nature"]
+    assert "created_at" in result
+    assert result["content_type"] == "image/png"
+    assert result["matches"] == [
+        {"term": "land", "matched_tag": "landscape", "match_type": "prefix"}
+    ]
+
+
+def test__api_search__fuzzy_match__includes_score(client):
+    upload_id = _create_upload(client)
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get("/uploads/search", params={"q": "lanscape"}, headers=get_auth_headers())
+
+    assert response.status_code == 200
+    match = response.json()["results"][0]["matches"][0]
+    assert match["match_type"] == "fuzzy"
+    assert 0.0 < match["score"] < 1.0
+
+
+def test__api_search__exact_match__score_omitted(client):
+    upload_id = _create_upload(client)
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get("/uploads/search", params={"q": "landscape"}, headers=get_auth_headers())
+
+    match = response.json()["results"][0]["matches"][0]
+    assert match["match_type"] == "exact"
+    assert "score" not in match
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        pytest.param("a b c d e f", id="more_than_five_terms"),
+        pytest.param("!!! ???", id="zero_surviving_terms"),
+        pytest.param("x" * 257, id="query_too_long"),
+        pytest.param("", id="empty_query"),
+    ],
+)
+def test__api_search__invalid_query__returns_422(client, query):
+    response = client.get("/uploads/search", params={"q": query}, headers=get_auth_headers())
+
+    assert response.status_code == 422
+
+
+def test__api_search__missing_q__returns_422(client):
+    response = client.get("/uploads/search", headers=get_auth_headers())
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({"offset": -1}, id="negative_offset"),
+        pytest.param({"limit": 0}, id="zero_limit"),
+        pytest.param({"limit": 101}, id="limit_over_max"),
+    ],
+)
+def test__api_search__pagination_out_of_bounds__returns_422(client, params):
+    response = client.get(
+        "/uploads/search", params={"q": "cat", **params}, headers=get_auth_headers()
+    )
 
     assert response.status_code == 422
 
