@@ -736,6 +736,112 @@ def test__api_get_upload_thumbnail__corrupted_image_bytes__returns_422(client):
     assert response.status_code == 422
 
 
+def test__api_search__without_auth__returns_401(client):
+    response = client.get("/uploads/search", params={"q": "landscape"})
+
+    assert response.status_code == 401
+
+
+def test__api_search__route_precedence__not_shadowed_by_get_upload(client):
+    response = client.get("/uploads/search", params={"q": "anything"}, headers=get_auth_headers())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"results", "total_count", "semantic_status"}
+
+
+def test__api_search__lexical_results__envelope_and_match_metadata(client):
+    upload_id = _create_upload(client)
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape", "nature"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get("/uploads/search", params={"q": "land"}, headers=get_auth_headers())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_count"] == 1
+    assert body["semantic_status"] == "disabled"
+    result = body["results"][0]
+    assert result["upload_id"] == upload_id
+    assert sorted(result["tags"]) == ["landscape", "nature"]
+    assert "created_at" in result
+    assert result["content_type"] == "image/png"
+    assert result["matches"] == [
+        {"term": "land", "matched_tag": "landscape", "match_type": "prefix"}
+    ]
+
+
+def test__api_search__fuzzy_match__includes_score(client):
+    upload_id = _create_upload(client)
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get("/uploads/search", params={"q": "lanscape"}, headers=get_auth_headers())
+
+    assert response.status_code == 200
+    match = response.json()["results"][0]["matches"][0]
+    assert match["match_type"] == "fuzzy"
+    assert 0.0 < match["score"] < 1.0
+
+
+def test__api_search__exact_match__score_omitted(client):
+    upload_id = _create_upload(client)
+    client.put(
+        f"/uploads/{upload_id}/tags",
+        json={"tags": ["landscape"]},
+        headers=get_auth_headers(),
+    )
+
+    response = client.get("/uploads/search", params={"q": "landscape"}, headers=get_auth_headers())
+
+    match = response.json()["results"][0]["matches"][0]
+    assert match["match_type"] == "exact"
+    assert "score" not in match
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        pytest.param("a b c d e f", id="more_than_five_terms"),
+        pytest.param("!!! ???", id="zero_surviving_terms"),
+        pytest.param("x" * 257, id="query_too_long"),
+        pytest.param("", id="empty_query"),
+    ],
+)
+def test__api_search__invalid_query__returns_422(client, query):
+    response = client.get("/uploads/search", params={"q": query}, headers=get_auth_headers())
+
+    assert response.status_code == 422
+
+
+def test__api_search__missing_q__returns_422(client):
+    response = client.get("/uploads/search", headers=get_auth_headers())
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({"offset": -1}, id="negative_offset"),
+        pytest.param({"limit": 0}, id="zero_limit"),
+        pytest.param({"limit": 101}, id="limit_over_max"),
+    ],
+)
+def test__api_search__pagination_out_of_bounds__returns_422(client, params):
+    response = client.get(
+        "/uploads/search", params={"q": "cat", **params}, headers=get_auth_headers()
+    )
+
+    assert response.status_code == 422
+
+
 @pytest.fixture
 def webhook_route(respx_mock):
     return respx_mock.post(WEBHOOK_URL).mock(return_value=httpx.Response(200))

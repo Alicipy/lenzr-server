@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from lenzr_server.dependencies import (
     check_login_valid,
     get_max_upload_bytes,
+    get_search_service,
     get_tag_service,
     get_thumbnail_service,
     get_upload_service,
@@ -15,12 +16,14 @@ from lenzr_server.dependencies import (
 from lenzr_server.responses import NOT_FOUND_RESPONSES, ImageResponse
 from lenzr_server.schemas import (
     ErrorResponse,
+    SearchResponse,
     TagListResponse,
     TagsUpdateRequest,
     UploadMetaDataCreateResponse,
     UploadMetaDataDeleteResponse,
     UploadWithTagsResponse,
 )
+from lenzr_server.search_service import MAX_QUERY_LENGTH, SearchService
 from lenzr_server.tag_service import TagService
 from lenzr_server.thumbnail_service import InvalidImageException, ThumbnailService
 from lenzr_server.types import TagName, UploadID
@@ -87,6 +90,33 @@ async def upload_file(
 
     response.status_code = 201 if created else 200
     return UploadMetaDataCreateResponse(upload_id=upload_id, tags=result_tags)
+
+
+# Must precede GET /{upload_id}: "search" is a valid UploadID.
+@upload_router.get(
+    "/search",
+    summary="Search uploads by query",
+    description="Search uploads by tags, ranked exact > prefix > substring > fuzzy > semantic. "
+    "Every term must match (AND).",
+    response_model=SearchResponse,
+    response_model_exclude_none=True,
+    status_code=200,
+    responses={
+        200: {"description": "Ranked search results"},
+        422: {"description": "Invalid search query", "model": ErrorResponse},
+    },
+)
+async def search_uploads(
+    q: str = Query(
+        ..., min_length=1, max_length=MAX_QUERY_LENGTH, description="Free-form search query"
+    ),
+    offset: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of items to return"),
+    search_service: SearchService = Depends(get_search_service),
+    _login_valid: None = Depends(check_login_valid),
+):
+    results = await run_in_threadpool(search_service.search, q, offset=offset, limit=limit)
+    return SearchResponse.from_search_results(results)
 
 
 @upload_router.get(

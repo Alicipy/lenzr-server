@@ -1,3 +1,4 @@
+import datetime
 import io
 import os
 import tempfile
@@ -7,13 +8,17 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import create_engine, event
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session, SQLModel, col, select
 
 from lenzr_server.main import app
+from lenzr_server.models.tags import Tag, UploadTag
+from lenzr_server.models.uploads import UploadMetaData
 from lenzr_server.thumbnail_service import InMemoryThumbnailCache, InMemoryThumbnailService
 
 os.environ["ENVIRONMENT"] = "development"
 os.environ["UPLOAD_STORAGE_PATH"] = tempfile.mkdtemp()
+
+UPLOAD_BASE_TIME = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
 
 
 @pytest.fixture
@@ -26,6 +31,30 @@ def database_session():
         if session.is_active:
             session.commit()
     SQLModel.metadata.drop_all(engine)
+
+
+@pytest.fixture
+def add_upload(database_session) -> Callable[..., UploadMetaData]:
+    """Add a tagged upload created `hour` hours after UPLOAD_BASE_TIME."""
+
+    def _add(upload_id: str, tags: list[str], hour: int = 0) -> UploadMetaData:
+        created_at = UPLOAD_BASE_TIME + datetime.timedelta(hours=hour)
+        upload = UploadMetaData(
+            upload_id=upload_id, content_type="image/png", created_at=created_at
+        )
+        database_session.add(upload)
+        database_session.flush()
+        for name in tags:
+            tag = database_session.exec(select(Tag).where(col(Tag.name) == name)).first()
+            if tag is None:
+                tag = Tag(name=name)
+                database_session.add(tag)
+                database_session.flush()
+            database_session.add(UploadTag(upload_pk=upload.pk, tag_pk=tag.pk))
+        database_session.flush()
+        return upload
+
+    return _add
 
 
 @pytest.fixture(autouse=True)

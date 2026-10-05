@@ -8,6 +8,7 @@ import lenzr_server.security as security
 from lenzr_server.db import engine
 from lenzr_server.file_storages.file_storage import FileStorage
 from lenzr_server.file_storages.on_disk_file_storage import OnDiskFileStorage
+from lenzr_server.search_service import SearchService
 from lenzr_server.tag_service import TagService
 from lenzr_server.thumbnail_service import InMemoryThumbnailService, ThumbnailService
 from lenzr_server.upload_id_creators.hashing_id_creator import HashingIDCreator
@@ -60,6 +61,12 @@ def get_tag_service(
     db_session: Session = Depends(get_db_session),
 ):
     return TagService(database_session=db_session)
+
+
+def get_search_service(
+    db_session: Session = Depends(get_db_session),
+) -> SearchService:
+    return SearchService(database_session=db_session)
 
 
 def get_thumbnail_service(request: Request) -> ThumbnailService:
