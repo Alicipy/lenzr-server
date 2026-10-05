@@ -44,6 +44,9 @@ source = "uv-dynamic-versioning"
 [tool.uv]
 cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true }}]
 
+[tool.pytest.ini_options]
+filterwarnings = ["error"]
+
 [tool.ruff]
 # Enable all default rules and extensions
 line-length = 100

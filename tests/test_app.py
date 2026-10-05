@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlmodel import SQLModel
+from starlette.datastructures import UploadFile
 
 from lenzr_server.db import engine
 from lenzr_server.dependencies import get_id_creator, get_webhook_notifier
@@ -19,16 +20,13 @@ WEBHOOK_URL = "http://localhost/hook"
 creator = CountingIdCreator()
 
 
-def counting_id_creator():
-    return creator
-
-
-app.dependency_overrides[get_id_creator] = counting_id_creator
-
-
 @pytest.fixture(autouse=True)
-def reset_creator():
+def counting_ids():
+    """Predictable upload IDs, scoped to this module."""
     creator.reset()
+    app.dependency_overrides[get_id_creator] = lambda: creator
+    yield
+    app.dependency_overrides.pop(get_id_creator, None)
 
 
 @pytest.fixture(autouse=True)
@@ -96,6 +94,16 @@ def test__api_post_upload__upload_image_file_twice__returns_201_and_200_with_id(
     assert response1.json()["upload_id"] == response2.json()["upload_id"]
 
 
+def test__api_post_upload__wrong_credentials__returns_401_unauthorized(client):
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"Hello, world!", "image/png")},
+        headers=get_auth_headers(password="wrong_pass"),
+    )
+
+    assert response.status_code == 401
+
+
 def test__api_post_upload__upload_image_file_without_auth__returns_401_unauthorized(client):
     response = client.post(
         "/uploads", files={"upload": ("test.png", b"Hello, world!", "image/png")}
@@ -148,6 +156,25 @@ def test__api_post_upload__file_at_size_limit__accepted(client, monkeypatch):
     )
 
     assert response.status_code == 201
+
+
+def test__api_post_upload__oversized_body_with_unknown_size__returns_413(
+    client, monkeypatch, mocker
+):
+    monkeypatch.setenv("MAX_UPLOAD_BYTES", "16")
+    # Simulate a client omitting Content-Length, so upload.size is None.
+    mocker.patch.object(
+        UploadFile, "size", property(lambda self: None, lambda self, value: None), create=True
+    )
+
+    response = client.post(
+        "/uploads",
+        files={"upload": ("test.png", b"x" * 32, "image/png")},
+        headers=get_auth_headers(),
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Uploaded file exceeds size limit"
 
 
 def test__api_get_upload_upload_id___get_upload_after_post_with_id__returns_200_with_data(client):

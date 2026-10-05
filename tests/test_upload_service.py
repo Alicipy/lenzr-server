@@ -138,6 +138,16 @@ def test__get_upload__missing_database_entry__raises_not_found_exception(upload_
         upload_service.get_upload("missing_upload_id")
 
 
+def test__get_upload__file_missing_on_disk__raises_not_found_exception(
+    upload_service, file_storage
+):
+    upload = upload_service.add_upload(b"content", "text/plain")
+    os.remove(os.path.join(file_storage._base_path, upload.upload_id))
+
+    with pytest.raises(UploadNotFoundException):
+        upload_service.get_upload(upload.upload_id)
+
+
 def test__delete_upload__valid_id__deletes_from_database_and_disk(
     upload_service, database_session, file_storage
 ):

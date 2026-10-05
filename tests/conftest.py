@@ -1,8 +1,14 @@
+# ruff: noqa: E402
+# Set env before importing lenzr_server: db.py builds its engine from DATABASE_URL.
 import datetime
 import io
 import os
 import tempfile
 from collections.abc import Callable
+
+os.environ["ENVIRONMENT"] = "development"
+os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp(prefix='lenzr-test-')}/db.sqlite3"
+os.environ["UPLOAD_STORAGE_PATH"] = tempfile.mkdtemp()
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,9 +20,6 @@ from lenzr_server.main import app
 from lenzr_server.models.tags import Tag, UploadTag
 from lenzr_server.models.uploads import UploadMetaData
 from lenzr_server.thumbnail_service import InMemoryThumbnailCache, InMemoryThumbnailService
-
-os.environ["ENVIRONMENT"] = "development"
-os.environ["UPLOAD_STORAGE_PATH"] = tempfile.mkdtemp()
 
 UPLOAD_BASE_TIME = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
 
@@ -31,6 +34,7 @@ def database_session():
         if session.is_active:
             session.commit()
     SQLModel.metadata.drop_all(engine)
+    engine.dispose()
 
 
 @pytest.fixture

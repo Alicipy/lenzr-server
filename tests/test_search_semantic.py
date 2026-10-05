@@ -180,6 +180,8 @@ def test__index__empty_vocabulary__no_encode_call():
     not isinstance(try_to_load_from_cache(DEFAULT_LOCAL_MODEL, "model.safetensors"), str),
     reason=f"{DEFAULT_LOCAL_MODEL} not in the local HF cache; CI never downloads",
 )
+# model2vec leaks a config.json handle when loading a real model.
+@pytest.mark.filterwarnings("ignore::ResourceWarning")
 def test__index__real_model__ocean_is_similar_to_sea():
     index = TagEmbeddingIndex(load_static_model(DEFAULT_LOCAL_MODEL), DEFAULT_SIMILARITY_THRESHOLD)
 
